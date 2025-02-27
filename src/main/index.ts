@@ -1,7 +1,24 @@
 import { app, shell, BrowserWindow, ipcMain } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
-import icon from '../../resources/icon.png?asset'
+import { spawn } from 'child_process'
+
+let pythonProcess: any = null
+
+function startPythonBackend(): void {
+  // 启动 Python 后端服务
+  pythonProcess = spawn('python', ['-m', 'uvicorn', 'app.main:app', '--reload'], {
+    cwd: join(__dirname, '../../backend')
+  })
+
+  pythonProcess.stdout.on('data', (data: any) => {
+    console.log(`Python Backend: ${data}`)
+  })
+
+  pythonProcess.stderr.on('data', (data: any) => {
+    console.error(`Python Backend Error: ${data}`)
+  })
+}
 
 function createWindow(): void {
   // Create the browser window.
@@ -10,10 +27,14 @@ function createWindow(): void {
     height: 670,
     show: false,
     autoHideMenuBar: true,
-    ...(process.platform === 'linux' ? { icon } : {}),
+    backgroundColor: '#f5f5f5',
+    transparent: false,
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
-      sandbox: false
+      sandbox: false,
+      webSecurity: false,  // 禁用 web 安全限制
+      allowRunningInsecureContent: true,  // 允许运行不安全内容
+      contextIsolation: true
     }
   })
 
@@ -52,6 +73,9 @@ app.whenReady().then(() => {
   // IPC test
   ipcMain.on('ping', () => console.log('pong'))
 
+  // 启动 Python 后端
+  startPythonBackend()
+
   createWindow()
 
   app.on('activate', function () {
@@ -67,6 +91,13 @@ app.whenReady().then(() => {
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit()
+  }
+})
+
+app.on('will-quit', () => {
+  // 关闭 Python 后端进程
+  if (pythonProcess) {
+    pythonProcess.kill()
   }
 })
 

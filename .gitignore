@@ -33,6 +33,7 @@ coverage
 .env.development.local
 .env.test.local
 .env.production.local
+.env.development
 
 # OS
 .DS_Store
@@ -49,3 +50,39 @@ yarn-error.log*
 # Electron specific
 .electron-vendors
 electron-builder.yml
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Web
+web-ui/node_modules/
+web-ui/dist/
+web-ui/build/
+web-ui/.env*
+web-ui/.cache/
+web-ui/coverage/

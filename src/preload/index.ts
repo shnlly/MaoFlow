@@ -11,6 +11,12 @@ if (process.contextIsolated) {
   try {
     contextBridge.exposeInMainWorld('electron', electronAPI)
     contextBridge.exposeInMainWorld('api', api)
+    contextBridge.exposeInMainWorld('__ELECTRON__', true)
+    contextBridge.exposeInMainWorld('versions', {
+      node: () => process.versions.node,
+      chrome: () => process.versions.chrome,
+      electron: () => process.versions.electron
+    })
   } catch (error) {
     console.error(error)
   }
