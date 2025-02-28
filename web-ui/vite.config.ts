@@ -7,8 +7,8 @@ export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: {
-      '@shared': path.resolve(__dirname, '../src/shared')
-    }
+      '@shared': path.resolve(__dirname, '../src/shared'),
+    },
   },
   server: {
     port: 5173,

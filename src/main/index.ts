@@ -4,6 +4,7 @@ import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { spawn } from 'child_process'
 
 let pythonProcess: any = null
+let mainWindow: BrowserWindow | null = null
 
 function startPythonBackend(): void {
   // 启动 Python 后端服务
@@ -20,9 +21,47 @@ function startPythonBackend(): void {
   })
 }
 
+function setupIpcHandlers() {
+  // 窗口控制
+  ipcMain.on('window:minimize', () => {
+    mainWindow?.minimize()
+  })
+
+  ipcMain.on('window:maximize', () => {
+    if (mainWindow?.isMaximized()) {
+      mainWindow?.unmaximize()
+    } else {
+      mainWindow?.maximize()
+    }
+  })
+
+  ipcMain.on('window:close', () => {
+    mainWindow?.close()
+  })
+
+  // 主题设置
+  let currentTheme: 'light' | 'dark' = 'light'
+  ipcMain.handle('settings:getTheme', () => currentTheme)
+  ipcMain.handle('settings:setTheme', (_, theme: 'light' | 'dark') => {
+    currentTheme = theme
+  })
+
+  // 后端服务状态
+  ipcMain.handle('backend:status', () => ({
+    running: pythonProcess !== null && !pythonProcess.killed
+  }))
+
+  ipcMain.handle('backend:restart', () => {
+    if (pythonProcess) {
+      pythonProcess.kill()
+    }
+    startPythonBackend()
+  })
+}
+
 function createWindow(): void {
   // Create the browser window.
-  const mainWindow = new BrowserWindow({
+  mainWindow = new BrowserWindow({
     width: 900,
     height: 670,
     show: false,
@@ -34,12 +73,13 @@ function createWindow(): void {
       sandbox: false,
       webSecurity: false,  // 禁用 web 安全限制
       allowRunningInsecureContent: true,  // 允许运行不安全内容
-      contextIsolation: true
+      contextIsolation: true,
+      nodeIntegration: true
     }
   })
 
   mainWindow.on('ready-to-show', () => {
-    mainWindow.show()
+    mainWindow?.show()
   })
 
   mainWindow.webContents.setWindowOpenHandler((details) => {
@@ -70,8 +110,8 @@ app.whenReady().then(() => {
     optimizer.watchWindowShortcuts(window)
   })
 
-  // IPC test
-  ipcMain.on('ping', () => console.log('pong'))
+  // 设置 IPC 处理器
+  setupIpcHandlers()
 
   // 启动 Python 后端
   startPythonBackend()

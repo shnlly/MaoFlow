@@ -1,16 +1,18 @@
 import React from 'react'
-import { Layout } from 'antd'
-import Chat from '@shared/components/Chat'
+import { Layout } from '@shared/components/Layout'
+import { App as AntApp } from 'antd'
+import { setPlatformBridge } from '@shared/platform'
+import { WebPlatformBridge } from './platform/WebPlatformBridge'
+import 'antd/dist/reset.css'
 
-const { Content } = Layout
+// 设置 Web 平台的实现
+setPlatformBridge(new WebPlatformBridge())
 
 const App: React.FC = () => {
   return (
-    <Layout style={{ height: '100vh' }}>
-      <Content style={{ padding: '20px' }}>
-        <Chat />
-      </Content>
-    </Layout>
+    <AntApp>
+      <Layout />
+    </AntApp>
   )
 }
 

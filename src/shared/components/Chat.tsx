@@ -80,11 +80,32 @@ const suggestedPrompts = [
   },
 ];
 
-const Chat: React.FC = () => {
+interface ChatProps {
+  sessionId: string;
+}
+
+const Chat: React.FC<ChatProps> = ({ sessionId }) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [inputValue, setInputValue] = useState('');
   const { message } = App.useApp();
+
+  // 当 sessionId 改变时加载历史消息
+  useEffect(() => {
+    loadSessionMessages();
+  }, [sessionId]);
+
+  const loadSessionMessages = async () => {
+    try {
+      const response = await fetch(`http://localhost:8000/api/chat/history/${sessionId}`);
+      if (response.ok) {
+        const history = await response.json();
+        setMessages(history);
+      }
+    } catch (error) {
+      console.error('Failed to load session messages:', error);
+    }
+  };
 
   useEffect(() => {
     window.console.log('=== 消息列表已更新 ===', messages);
@@ -220,7 +241,7 @@ const Chat: React.FC = () => {
       setInputValue('');
       setMessages(prev => [...prev, { content: text, role: 'user' }]);
       
-      const response = await fetch(`http://localhost:8000/api/chat?query=${encodeURIComponent(text)}`, {
+      const response = await fetch(`http://localhost:8000/api/chat/${sessionId}?query=${encodeURIComponent(text)}`, {
         method: 'GET',
       });
 
