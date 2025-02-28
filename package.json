@@ -22,10 +22,12 @@
     "@ant-design/x": "^1.0.5",
     "@electron-toolkit/preload": "^3.0.0",
     "@electron-toolkit/utils": "^3.0.0",
+    "@types/react-syntax-highlighter": "^15.5.13",
     "antd": "^5.24.2",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "react-markdown": "^10.0.0"
+    "react-markdown": "^10.0.0",
+    "react-syntax-highlighter": "^15.6.1"
   },
   "devDependencies": {
     "@electron-toolkit/tsconfig": "^1.0.1",

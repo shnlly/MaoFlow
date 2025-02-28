@@ -4,6 +4,9 @@ from openai import AsyncOpenAI
 import json
 import asyncio
 from ..config.settings import get_settings, Settings
+from typing import AsyncGenerator
+import httpx
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 router = APIRouter()
 
@@ -17,40 +20,69 @@ def create_stream_chunk(type: str | None, content: str) -> str:
 async def create_chat_completion(query: str, api_key: str, model_name: str, base_uri: str):
     client = AsyncOpenAI(
         api_key=api_key,
-        base_url=base_uri
+        base_url=base_uri,
+        timeout=httpx.Timeout(connect=5.0, read=300.0, write=300.0, pool=300.0)
     )
+
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=4, max=10)
+    )
+    async def get_chat_response():
+        return await client.chat.completions.create(
+            model=model_name,
+            messages=[{"role": "user", "content": query}],
+            stream=True
+        )
 
     try:
         async def generate():
-            response = await client.chat.completions.create(
-                model=model_name,
-                messages=[{"role": "user", "content": query}],
-                stream=True
-            )
+            try:
+                response = await get_chat_response()
 
-            think_buffer = ""
-            message_buffer = ""
-            current_type = None
-            
-            async for chunk in response:
-                if not chunk.choices[0].delta:
-                    continue
+                think_buffer = ""
+                message_buffer = ""
+                current_type = None
                 
-                # 处理思考内容
-                if hasattr(chunk.choices[0].delta, 'reasoning_content') and chunk.choices[0].delta.reasoning_content:
-                    if current_type != "think":
-                        current_type = "think"
-                        think_buffer = ""
-                    think_buffer += chunk.choices[0].delta.reasoning_content
-                    yield create_stream_chunk("think", think_buffer)
-                
-                # 处理正文内容
-                elif hasattr(chunk.choices[0].delta, 'content') and chunk.choices[0].delta.content:
-                    if current_type != "message":
-                        current_type = "message"
-                        message_buffer = ""
-                    message_buffer += chunk.choices[0].delta.content
+                async for chunk in response:
+                    if not chunk.choices[0].delta:
+                        continue
+                    
+                    try:
+                        # 处理思考内容
+                        if hasattr(chunk.choices[0].delta, 'reasoning_content') and chunk.choices[0].delta.reasoning_content:
+                            if current_type != "think":
+                                current_type = "think"
+                                think_buffer = ""
+                            think_buffer += chunk.choices[0].delta.reasoning_content
+                            yield create_stream_chunk("think", think_buffer)
+                        
+                        # 处理正文内容
+                        elif hasattr(chunk.choices[0].delta, 'content') and chunk.choices[0].delta.content:
+                            if current_type != "message":
+                                current_type = "message"
+                                message_buffer = ""
+                            message_buffer += chunk.choices[0].delta.content
+                            yield create_stream_chunk("message", message_buffer)
+                    except Exception as chunk_error:
+                        print(f"处理数据块时出错: {str(chunk_error)}")
+                        continue
+
+                # 确保最后一个消息被发送
+                if message_buffer:
                     yield create_stream_chunk("message", message_buffer)
+                elif think_buffer:
+                    yield create_stream_chunk("think", think_buffer)
+
+            except (httpx.ReadTimeout, httpx.ConnectTimeout) as e:
+                yield create_stream_chunk("message", f"请求超时，请重试。错误信息：{str(e)}")
+            except httpx.RemoteProtocolError as e:
+                yield create_stream_chunk("message", "连接中断，请重试。")
+            except Exception as e:
+                yield create_stream_chunk("message", f"发生错误：{str(e)}")
+            finally:
+                # 确保流正常结束
+                yield "data: [DONE]\n\n"
 
         return generate()
     except Exception as e:
@@ -68,17 +100,21 @@ async def chat(
     model_name = settings.DEFAULT_MODEL_NAME
     base_uri = settings.DEFAULT_BASE_URI
 
-    generator = await create_chat_completion(query, api_key, model_name, base_uri)
-    
-    return StreamingResponse(
-        generator,
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-            "Content-Type": "text/event-stream"
-        }
-    )
+    try:
+        generator = await create_chat_completion(query, api_key, model_name, base_uri)
+        
+        return StreamingResponse(
+            generator,
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "Content-Type": "text/event-stream",
+                "X-Accel-Buffering": "no"  # 禁用 Nginx 缓冲
+            }
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/chat/test")
 async def chat_test() -> StreamingResponse:

@@ -3,16 +3,35 @@ import { Bubble, Sender, Prompts, ThoughtChain } from '@ant-design/x';
 import { App, Flex, Typography, Card } from 'antd';
 import { CopyOutlined, RobotOutlined, UserOutlined, LoadingOutlined } from '@ant-design/icons';
 import ReactMarkdown from 'react-markdown';
+import { Light as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { vs2015 } from 'react-syntax-highlighter/dist/esm/styles/hljs';
+import python from 'react-syntax-highlighter/dist/esm/languages/hljs/python';
+import javascript from 'react-syntax-highlighter/dist/esm/languages/hljs/javascript';
+import typescript from 'react-syntax-highlighter/dist/esm/languages/hljs/typescript';
+import bash from 'react-syntax-highlighter/dist/esm/languages/hljs/bash';
+
+// 注册常用的编程语言
+SyntaxHighlighter.registerLanguage('python', python);
+SyntaxHighlighter.registerLanguage('javascript', javascript);
+SyntaxHighlighter.registerLanguage('typescript', typescript);
+SyntaxHighlighter.registerLanguage('bash', bash);
 
 window.console.log('=== Chat 组件模块加载 ===');
 
 // 消息类型定义
 type MessageType = 'think' | 'message' | 'tool';
 
+interface ThoughtItem {
+  type: MessageType;
+  content: string;
+  timestamp: number;
+}
+
 interface Message {
   content: string;
   role: 'user' | 'assistant';
   type?: MessageType;
+  thoughts?: ThoughtItem[];
 }
 
 // 流式响应数据结构
@@ -24,32 +43,22 @@ interface StreamChunk {
 // 消息类型配置
 const MESSAGE_TYPE_CONFIG = {
   think: {
-    title: '思考过程',
-    icon: <LoadingOutlined />,
-    render: (content: string) => (
-      <ThoughtChain
-        items={[
-          {
-            title: '思考过程',
-            status: 'pending',
-            icon: <LoadingOutlined />,
-            content: content,
-          }
-        ]}
-      />
-    )
+    title: '思考推理',
+    description: '正在分析和思考问题',
+    icon: <LoadingOutlined style={{ color: '#1677ff' }} />,
+    status: 'pending' as const
   },
   message: {
-    title: '回答',
-    render: (content: string) => <ReactMarkdown>{content}</ReactMarkdown>
+    title: '最终回答',
+    description: '已完成分析',
+    icon: <RobotOutlined style={{ color: '#52c41a' }} />,
+    status: 'success' as const
   },
   tool: {
-    title: '工具使用',
-    render: (content: string) => (
-      <Card title="工具调用" style={{ marginTop: 8, background: '#fafafa' }}>
-        <ReactMarkdown>{content}</ReactMarkdown>
-      </Card>
-    )
+    title: '工具调用',
+    description: '使用工具辅助分析',
+    icon: <LoadingOutlined style={{ color: '#faad14' }} />,
+    status: 'pending' as const
   }
 };
 
@@ -74,6 +83,7 @@ const suggestedPrompts = [
 const Chat: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [inputValue, setInputValue] = useState('');
   const { message } = App.useApp();
 
   useEffect(() => {
@@ -86,31 +96,103 @@ const Chat: React.FC = () => {
     });
   };
 
+  const renderAssistantMessage = (thoughts: ThoughtItem[]) => {
+    const items = thoughts.map(thought => ({
+      title: MESSAGE_TYPE_CONFIG[thought.type].title,
+      description: MESSAGE_TYPE_CONFIG[thought.type].description,
+      status: MESSAGE_TYPE_CONFIG[thought.type].status,
+      icon: MESSAGE_TYPE_CONFIG[thought.type].icon,
+      content: (
+        <Typography>
+          <Typography.Paragraph>
+            {thought.type === 'message' ? (
+              <ReactMarkdown
+                components={{
+                  code({ className, children }) {
+                    const match = /language-(\w+)/.exec(className || '');
+                    const language = match ? match[1] : '';
+                    const code = String(children).replace(/\n$/, '');
+                    
+                    if (language) {
+                      return (
+                        <SyntaxHighlighter
+                          language={language}
+                          style={vs2015}
+                          customStyle={{
+                            margin: '0.5em 0',
+                            padding: '1em',
+                            borderRadius: '4px',
+                            fontSize: '14px'
+                          }}
+                        >
+                          {code}
+                        </SyntaxHighlighter>
+                      );
+                    }
+                    
+                    return (
+                      <code 
+                        className={className}
+                        style={{
+                          backgroundColor: '#f6f8fa',
+                          padding: '0.2em 0.4em',
+                          borderRadius: '3px',
+                          fontSize: '85%'
+                        }}
+                      >
+                        {children}
+                      </code>
+                    );
+                  }
+                }}
+              >
+                {thought.content}
+              </ReactMarkdown>
+            ) : (
+              thought.content.split('\n').map((line, index) => (
+                <div key={index}>{line}</div>
+              ))
+            )}
+          </Typography.Paragraph>
+        </Typography>
+      ),
+    }));
+
+    return (
+      <Card style={{ width: '100%', marginBottom: 16 }}>
+        <ThoughtChain
+          size="small"
+          items={items}
+          collapsible
+        />
+      </Card>
+    );
+  };
+
   const renderMessageContent = (msg: Message) => {
     if (msg.role === 'user') {
       return <Typography.Text>{msg.content}</Typography.Text>;
     }
 
-    const typeConfig = MESSAGE_TYPE_CONFIG[msg.type || 'message'];
-    return typeConfig.render(msg.content);
+    return msg.thoughts ? renderAssistantMessage(msg.thoughts) : null;
   };
 
   const renderMessage = (msg: Message) => {
     const isUser = msg.role === 'user';
     return (
-      <Flex vertical gap="small">
+      <Flex vertical gap="small" style={{ width: '100%' }}>
         <Flex align="start" justify={isUser ? 'flex-end' : 'flex-start'}>
-          <Bubble
-            content={msg.content}
-            placement={isUser ? 'end' : 'start'}
-            variant="filled"
-            shape="round"
-            style={{ maxWidth: '80%' }}
-            classNames={{
-              content: isUser ? 'user-message' : 'ai-message'
-            }}
-            avatar={
-              isUser ? (
+          {isUser ? (
+            <Bubble
+              content={msg.content}
+              placement="end"
+              variant="filled"
+              shape="round"
+              style={{ maxWidth: '80%' }}
+              classNames={{
+                content: 'user-message'
+              }}
+              avatar={
                 <UserOutlined style={{ 
                   fontSize: '18px',
                   padding: '8px',
@@ -118,38 +200,15 @@ const Chat: React.FC = () => {
                   borderRadius: '50%',
                   color: '#1677ff' 
                 }} />
-              ) : (
-                <RobotOutlined style={{ 
-                  fontSize: '18px',
-                  padding: '8px',
-                  backgroundColor: '#f6ffed',
-                  borderRadius: '50%',
-                  color: '#52c41a' 
-                }} />
-              )
-            }
-          >
-            {renderMessageContent(msg)}
-            {msg.role === 'assistant' && (
-              <CopyOutlined
-                style={{ 
-                  marginLeft: 8, 
-                  cursor: 'pointer',
-                  opacity: 0.7,
-                  fontSize: '14px',
-                  color: isUser ? '#fff' : '#666',
-                  transition: 'opacity 0.2s'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.opacity = '1';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.opacity = '0.7';
-                }}
-                onClick={() => copyMessage(msg.content)}
-              />
-            )}
-          </Bubble>
+              }
+            >
+              <Typography.Text>{msg.content}</Typography.Text>
+            </Bubble>
+          ) : (
+            <div style={{ width: '100%' }}>
+              {renderMessageContent(msg)}
+            </div>
+          )}
         </Flex>
       </Flex>
     );
@@ -158,6 +217,7 @@ const Chat: React.FC = () => {
   const handleRequest = async (text: string) => {
     try {
       setIsLoading(true);
+      setInputValue('');
       setMessages(prev => [...prev, { content: text, role: 'user' }]);
       
       const response = await fetch(`http://localhost:8000/api/chat?query=${encodeURIComponent(text)}`, {
@@ -176,7 +236,13 @@ const Chat: React.FC = () => {
       let currentMessage: Message = { 
         content: '', 
         role: 'assistant',
-        type: 'think'
+        thoughts: []
+      };
+
+      let currentThought: ThoughtItem = {
+        type: 'think',
+        content: '',
+        timestamp: Date.now()
       };
 
       setMessages(prev => [...prev, currentMessage]);
@@ -189,26 +255,82 @@ const Chat: React.FC = () => {
         const lines = chunk.split('\n');
         
         for (const line of lines) {
-          if (line.startsWith('data: ') && line.length > 6) {
-            try {
-              const data: StreamChunk = JSON.parse(line.slice(6));
+          if (!line || !line.startsWith('data: ')) continue;
+          
+          // 检查是否是结束标记
+          if (line.includes('[DONE]')) {
+            console.log('Stream completed');
+            continue;
+          }
+
+          try {
+            const data: StreamChunk = JSON.parse(line.slice(6));
+            
+            // 如果类型发生变化，创建新的思维节点
+            if (data.type && data.type !== currentThought.type) {
+              // 将当前思维节点添加到消息中
+              if (currentThought.content) {
+                currentMessage = {
+                  ...currentMessage,
+                  thoughts: [...(currentMessage.thoughts || []), { ...currentThought }]
+                };
+              }
+              // 创建新的思维节点
+              currentThought = {
+                type: data.type,
+                content: data.content,
+                timestamp: Date.now()
+              };
+            } else {
+              // 更新当前思维节点的内容
+              currentThought = {
+                ...currentThought,
+                content: data.content
+              };
+            }
+
+            // 更新消息，使用当前所有已完成的思维节点和当前正在进行的思维节点
+            setMessages(prev => {
+              const newMessages = [...prev];
+              const lastMessage = newMessages[newMessages.length - 1];
               
-              currentMessage = {
+              // 获取已有的思维节点，但排除掉与当前节点相同类型的
+              const existingThoughts = (lastMessage.thoughts || []).filter(
+                t => t.type !== currentThought.type
+              );
+              
+              newMessages[newMessages.length - 1] = {
                 ...currentMessage,
                 content: data.content,
-                type: data.type || currentMessage.type
+                thoughts: [...existingThoughts, currentThought]
               };
-
-              setMessages(prev => {
-                const newMessages = [...prev];
-                newMessages[newMessages.length - 1] = currentMessage;
-                return newMessages;
-              });
-            } catch (e) {
-              console.error('解析响应数据失败:', e);
+              return newMessages;
+            });
+          } catch (e) {
+            if (!line.includes('[DONE]')) {
+              console.error('解析响应数据失败:', e, '数据:', line);
             }
           }
         }
+      }
+
+      // 确保最后一个思维节点被添加到消息中
+      if (currentThought.content) {
+        setMessages(prev => {
+          const newMessages = [...prev];
+          const lastMessage = newMessages[newMessages.length - 1];
+          
+          // 获取已有的思维节点，但排除掉与当前节点相同类型的
+          const existingThoughts = (lastMessage.thoughts || []).filter(
+            t => t.type !== currentThought.type
+          );
+          
+          newMessages[newMessages.length - 1] = {
+            ...lastMessage,
+            thoughts: [...existingThoughts, currentThought]
+          };
+          return newMessages;
+        });
       }
     } catch (error) {
       console.error('Error:', error);
@@ -278,6 +400,8 @@ const Chat: React.FC = () => {
         )}
 
         <Sender 
+          value={inputValue}
+          onChange={setInputValue}
           onSubmit={handleRequest}
           disabled={isLoading}
           placeholder={isLoading ? "AI 正在思考中..." : "请输入您的问题"}
