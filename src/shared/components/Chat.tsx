@@ -7,7 +7,7 @@ import ReactMarkdown from 'react-markdown';
 window.console.log('=== Chat 组件模块加载 ===');
 
 // 消息类型定义
-type MessageType = 'thinking' | 'markdown' | 'tool';
+type MessageType = 'think' | 'message' | 'tool';
 
 interface Message {
   content: string;
@@ -17,13 +17,13 @@ interface Message {
 
 // 流式响应数据结构
 interface StreamChunk {
-  type: MessageType;
-  message: string;
+  type?: MessageType;
+  content: string;
 }
 
 // 消息类型配置
 const MESSAGE_TYPE_CONFIG = {
-  thinking: {
+  think: {
     title: '思考过程',
     icon: <LoadingOutlined />,
     render: (content: string) => (
@@ -39,7 +39,7 @@ const MESSAGE_TYPE_CONFIG = {
       />
     )
   },
-  markdown: {
+  message: {
     title: '回答',
     render: (content: string) => <ReactMarkdown>{content}</ReactMarkdown>
   },
@@ -87,11 +87,11 @@ const Chat: React.FC = () => {
   };
 
   const renderMessageContent = (msg: Message) => {
-    if (!msg.type || msg.role === 'user') {
+    if (msg.role === 'user') {
       return <Typography.Text>{msg.content}</Typography.Text>;
     }
 
-    const typeConfig = MESSAGE_TYPE_CONFIG[msg.type];
+    const typeConfig = MESSAGE_TYPE_CONFIG[msg.type || 'message'];
     return typeConfig.render(msg.content);
   };
 
@@ -173,11 +173,13 @@ const Chat: React.FC = () => {
         throw new Error('无法读取响应');
       }
 
-      setMessages(prev => [...prev, { 
+      let currentMessage: Message = { 
         content: '', 
         role: 'assistant',
-        type: 'thinking'
-      }]);
+        type: 'think'
+      };
+
+      setMessages(prev => [...prev, currentMessage]);
 
       while (true) {
         const { done, value } = await reader.read();
@@ -191,14 +193,15 @@ const Chat: React.FC = () => {
             try {
               const data: StreamChunk = JSON.parse(line.slice(6));
               
+              currentMessage = {
+                ...currentMessage,
+                content: data.content,
+                type: data.type || currentMessage.type
+              };
+
               setMessages(prev => {
                 const newMessages = [...prev];
-                const lastMessage = newMessages[newMessages.length - 1];
-                newMessages[newMessages.length - 1] = {
-                  ...lastMessage,
-                  content: data.message,
-                  type: data.type
-                };
+                newMessages[newMessages.length - 1] = currentMessage;
                 return newMessages;
               });
             } catch (e) {

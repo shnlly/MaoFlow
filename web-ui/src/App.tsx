@@ -1,6 +1,6 @@
 import React from 'react'
 import { Layout } from 'antd'
-import { Chat } from 'src/shared/components/Chat'
+import Chat from '@shared/components/Chat'
 
 const { Content } = Layout
 

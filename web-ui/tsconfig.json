@@ -20,17 +20,12 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
 
-    /* Path aliases */
-    "baseUrl": "..",
+    /* Path Aliases */
+    "baseUrl": ".",
     "paths": {
-      "@/*": ["web-ui/src/*"],
-      "src/*": ["src/*"]
+      "@shared/*": ["../src/shared/*"]
     }
   },
-  "include": [
-    "src/**/*",
-    "../src/shared/**/*",
-    "../src/styles/**/*"
-  ],
+  "include": ["src", "../src/shared"],
   "references": [{ "path": "./tsconfig.node.json" }]
 } 

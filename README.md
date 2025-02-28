@@ -35,7 +35,6 @@ MaoFlow/
 
 - Node.js 18+
 - Python 3.8+
-- pnpm (推荐) 或 npm
 
 ## 开发环境设置
 
@@ -54,11 +53,11 @@ pip install -r requirements.txt
 
 ```bash
 # 安装根目录依赖
-pnpm install
+npm install
 
 # 安装前端依赖
 cd web-ui
-pnpm install
+npm install
 ```
 
 ## 启动项目
@@ -68,17 +67,17 @@ pnpm install
 1. 启动后端服务
 
 ```bash
-pnpm dev:api
+npm dev:api
 ```
 
 2. 启动前端开发服务器
 
 ```bash
 # Web 开发模式
-pnpm dev:web
+npm dev:web
 
 # Electron 开发模式
-pnpm dev
+npm dev
 ```
 
 ### 生产模式
@@ -86,13 +85,13 @@ pnpm dev
 1. 构建前端
 
 ```bash
-pnpm build:web
+npm build:web
 ```
 
 2. 打包 Electron 应用
 
 ```bash
-pnpm build:electron
+npm build:electron
 ```
 
 打包后的应用将在 `out` 目录中生成。
