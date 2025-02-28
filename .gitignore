@@ -79,6 +79,10 @@ wheels/
 .coverage
 htmlcov/
 
+# sqllite
+*.sqlite3
+*.db
+
 # Web
 web-ui/node_modules/
 web-ui/dist/

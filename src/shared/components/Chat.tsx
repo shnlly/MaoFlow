@@ -268,28 +268,23 @@ const Chat: React.FC = () => {
             
             // 如果类型发生变化，创建新的思维节点
             if (data.type && data.type !== currentThought.type) {
-              // 将当前思维节点添加到消息中
               if (currentThought.content) {
                 currentMessage = {
                   ...currentMessage,
                   thoughts: [...(currentMessage.thoughts || []), { ...currentThought }]
                 };
               }
-              // 创建新的思维节点
               currentThought = {
                 type: data.type,
-                content: data.content,
+                content: '',
                 timestamp: Date.now()
-              };
-            } else {
-              // 更新当前思维节点的内容
-              currentThought = {
-                ...currentThought,
-                content: data.content
               };
             }
 
-            // 更新消息，使用当前所有已完成的思维节点和当前正在进行的思维节点
+            // 累积当前类型的内容
+            currentThought.content += data.content;
+
+            // 更新消息
             setMessages(prev => {
               const newMessages = [...prev];
               const lastMessage = newMessages[newMessages.length - 1];
@@ -301,8 +296,7 @@ const Chat: React.FC = () => {
               
               newMessages[newMessages.length - 1] = {
                 ...currentMessage,
-                content: data.content,
-                thoughts: [...existingThoughts, currentThought]
+                thoughts: [...existingThoughts, { ...currentThought }]
               };
               return newMessages;
             });
@@ -327,7 +321,7 @@ const Chat: React.FC = () => {
           
           newMessages[newMessages.length - 1] = {
             ...lastMessage,
-            thoughts: [...existingThoughts, currentThought]
+            thoughts: [...existingThoughts, { ...currentThought }]
           };
           return newMessages;
         });
