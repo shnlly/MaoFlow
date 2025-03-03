@@ -9,14 +9,14 @@ class ConversationBase(BaseModel):
     title: str
     description: Optional[str] = None
     user_id: str
-    model: str
+    model_id: str
     
     model_config = ConfigDict(from_attributes=True)
 
 class ConversationCreate(ConversationBase):
     """创建会话的请求模型"""
     system_prompt: Optional[str] = None
-    meta_info: Dict[str, Any] = {"tags": [], "custom_settings": {}}
+    # meta_info: Dict[str, Any] = {"tags": [], "custom_settings": {}}
 
 class ConversationUpdate(BaseModel):
     """更新会话的请求模型"""
@@ -24,7 +24,7 @@ class ConversationUpdate(BaseModel):
     description: Optional[str] = None
     system_prompt: Optional[str] = None
     status: Optional[str] = None
-    meta_info: Optional[Dict[str, Any]] = None
+    # meta_info: Optional[Dict[str, Any]] = None
     
     model_config = ConfigDict(from_attributes=True)
 
@@ -38,7 +38,7 @@ class ConversationResponse(ConversationBase):
     message_count: int
     total_tokens: int
     last_message_at: Optional[datetime]
-    meta_info: Dict[str, Any]
+    # meta_info: Dict[str, Any]
 
 class MessageBase(BaseModel):
     """消息基础模型"""
@@ -52,7 +52,7 @@ class MessageCreate(MessageBase):
     """创建消息的请求模型"""
     conversation_id: str
     user_id: str
-    meta_info: Dict[str, Any] = {}
+    # meta_info: Dict[str, Any] = {}
 
 class MessageResponse(MessageBase):
     """消息的响应模型"""
@@ -63,7 +63,7 @@ class MessageResponse(MessageBase):
     processing_time: float
     conversation_id: str
     user_id: str
-    meta_info: Dict[str, Any]
+    # meta_info: Dict[str, Any]
 
 class MessageItemBase(BaseModel):
     """消息区块节点基础模型"""

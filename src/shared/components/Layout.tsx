@@ -22,6 +22,8 @@ export const Layout: React.FC = () => {
   const [collapsed, setCollapsed] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [models, setModels] = useState<any[]>([]);
+  const [defaultModel, setDefaultModel] = useState<string | null>(null);
 
   const { token } = theme.useToken();
   const platform = getPlatformBridge();
@@ -31,11 +33,11 @@ export const Layout: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (user) {
+    if (user?.id) {
       loadSessions();
-      loadSettings();
+      loadModels();
     }
-  }, [user]);
+  }, [user?.id]);
 
   const initializeUser = async () => {
     try {
@@ -55,7 +57,9 @@ export const Layout: React.FC = () => {
   const loadSessions = async () => {
     if (!user) return;
     try {
-      const loadedSessions = await platform.getSessions();
+      const response = await fetch(`http://localhost:8000/api/conversations/user/${user.id}`);
+      if (!response.ok) throw new Error('Failed to load sessions');
+      const loadedSessions = await response.json();
       setSessions(loadedSessions);
       if (loadedSessions.length > 0 && !currentSession) {
         setCurrentSession(loadedSessions[0]);
@@ -66,10 +70,27 @@ export const Layout: React.FC = () => {
     }
   };
 
-  const loadSettings = async () => {
-    if (!user) return;
+  const loadModels = async () => {
     try {
-      const settings = await platform.loadSettings();
+      const response = await fetch('http://localhost:8000/api/models');
+      if (!response.ok) throw new Error('Failed to load models');
+      const data = await response.json();
+      setModels(data.items);
+      if (data.items.length > 0) {
+        setDefaultModel(data.items[0].id);
+      }
+    } catch (error) {
+      console.error('Failed to load models:', error);
+      message.error('加载模型列表失败');
+    }
+  };
+
+  const loadSettings = async () => {
+    if (!user?.id) return;
+    try {
+      const response = await fetch(`http://localhost:8000/api/user/${user.id}/settings`);
+      if (!response.ok) throw new Error('Failed to load settings');
+      const settings = await response.json();
       setUser(prev => prev ? {
         ...prev,
         settings,
@@ -81,9 +102,29 @@ export const Layout: React.FC = () => {
   };
 
   const handleNewSession = async () => {
-    if (!user) return;
+    if (!user || !defaultModel) return;
     try {
-      const newSession = await platform.createSession();
+      const newSessionData = {
+        title: "新会话",
+        user_id: user.id,
+        model_id: defaultModel,
+        description: "",
+        system_prompt: "",
+        status: "active",
+        meta_info: {
+          tags: [],
+          custom_settings: {}
+        }
+      };
+      const response = await fetch('http://localhost:8000/api/conversations', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(newSessionData),
+      });
+      if (!response.ok) throw new Error('Failed to create session');
+      const newSession = await response.json();
       setSessions(prev => [...prev, newSession]);
       setCurrentSession(newSession);
     } catch (error) {
@@ -94,11 +135,15 @@ export const Layout: React.FC = () => {
 
   const handleDeleteSession = async (sessionId: string) => {
     try {
-      await platform.deleteSession(sessionId);
+      const response = await fetch(`http://localhost:8000/api/conversations/${sessionId}`, {
+        method: 'DELETE',
+      });
+      if (!response.ok) throw new Error('Failed to delete session');
       setSessions(prev => prev.filter(s => s.id !== sessionId));
       if (currentSession?.id === sessionId) {
         setCurrentSession(sessions[0] || null);
       }
+      message.success('会话已删除');
     } catch (error) {
       console.error('Failed to delete session:', error);
       message.error('删除会话失败');
@@ -167,17 +212,13 @@ export const Layout: React.FC = () => {
             mode="inline"
             selectedKeys={currentSession ? [currentSession.id] : []}
             style={{ borderRight: 0 }}
-          >
-            {sessions.map(session => (
-              <Menu.Item 
-                key={session.id}
-                icon={<MessageOutlined />}
-                onClick={() => setCurrentSession(session)}
-              >
-                {session.title}
-              </Menu.Item>
-            ))}
-          </Menu>
+            items={sessions.map(session => ({
+              key: session.id,
+              icon: <MessageOutlined />,
+              label: session.title,
+              onClick: () => setCurrentSession(session)
+            }))}
+          />
           <div style={{
             position: 'absolute',
             bottom: 0,
@@ -185,21 +226,23 @@ export const Layout: React.FC = () => {
             borderTop: `1px solid ${token.colorBorder}`,
             padding: '16px',
           }}>
-            <Menu mode="inline" selectable={false}>
-              <Menu.Item 
-                key="settings" 
-                icon={<SettingOutlined />}
-                onClick={() => setShowSettings(true)}
-              >
-                {!collapsed && '设置'}
-              </Menu.Item>
-              <Menu.Item 
-                key="user" 
-                icon={<Avatar size="small" icon={<UserOutlined />} />}
-              >
-                {!collapsed && user.name}
-              </Menu.Item>
-            </Menu>
+            <Menu 
+              mode="inline" 
+              selectable={false}
+              items={[
+                {
+                  key: 'settings',
+                  icon: <SettingOutlined />,
+                  label: !collapsed && '设置',
+                  onClick: () => setShowSettings(true)
+                },
+                {
+                  key: 'user',
+                  icon: <Avatar size="small" icon={<UserOutlined />} />,
+                  label: !collapsed && user.nickname
+                }
+              ]}
+            />
           </div>
         </Sider>
         <Content style={{ 

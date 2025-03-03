@@ -3,7 +3,9 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.llm.models.message import Message
+from app.llm.models.message_item import MessageItem
 from app.llm.schemas.message import MessageCreate, MessageResponse
+from app.llm.schemas.message_item import MessageItemCreate
 
 class MessageService:
     def __init__(self, db: AsyncSession):
@@ -15,6 +17,14 @@ class MessageService:
         await self.db.commit()
         await self.db.refresh(db_message)
         return db_message
+
+    async def create_message_item(self, item: MessageItemCreate) -> MessageItem:
+        """创建消息区块节点"""
+        db_item = MessageItem(**item.model_dump())
+        self.db.add(db_item)
+        await self.db.commit()
+        await self.db.refresh(db_item)
+        return db_item
 
     async def get_message(self, message_id: str) -> Optional[Message]:
         result = await self.db.execute(

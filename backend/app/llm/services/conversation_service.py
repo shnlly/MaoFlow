@@ -76,6 +76,12 @@ class ConversationService:
         conversation.soft_delete()
         await self.db.commit()
 
+    async def update_conversation_last_message(self, conversation_id: str) -> None:
+        """更新会话的最后消息时间"""
+        conversation = await self.get_conversation(conversation_id)
+        conversation.last_message_at = datetime.utcnow()
+        await self.db.commit()
+
 class MessageService:
     def __init__(self, db: AsyncSession):
         self.db = db

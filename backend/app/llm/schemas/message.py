@@ -3,9 +3,9 @@ from pydantic import BaseModel
 from app.llm.models.message import MessageRole, MessageType
 
 class MessageBase(BaseModel):
-    content: str
-    role: MessageRole
-    type: Optional[MessageType] = MessageType.TEXT
+    content: str = ""
+    role: MessageRole = MessageRole.USER
+    type: MessageType = MessageType.TEXT
     meta_info: Optional[dict] = {}
 
 class MessageCreate(MessageBase):
