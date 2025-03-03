@@ -1,21 +1,21 @@
 import asyncio
 from logging.config import fileConfig
-import os
-import sys
-from pathlib import Path
-
-# 添加项目根目录到Python路径
-backend_dir = Path(__file__).parents[1].absolute()
-sys.path.append(str(backend_dir))
 
 from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from alembic import context
+from dotenv import load_dotenv
+import os
 
-# 导入所有模型以便Alembic可以检测到
-from app.models import Base
+# 加载环境变量
+load_dotenv('.env.development')
+
+# 这里导入所有的模型
+from app.system.models import User
+from app.llm.models import Conversation, Message, MessageItem, LLMModel
+from core.base_model import Base
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -25,6 +25,8 @@ config = context.config
 # This line sets up loggers basically.
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
+print("测试：", os.getenv('DATABASE_URL', 'sqlite+aiosqlite:///./maoflow.db'))
+config.set_main_option('sqlalchemy.url', os.getenv('DATABASE_URL', 'sqlite+aiosqlite:///./maoflow.db'))
 
 # add your model's MetaData object here
 # for 'autogenerate' support
@@ -68,7 +70,7 @@ def do_run_migrations(connection: Connection) -> None:
         context.run_migrations()
 
 async def run_async_migrations() -> None:
-    """在异步环境中运行迁移"""
+    """Run migrations in 'online' mode."""
     connectable = async_engine_from_config(
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",
@@ -81,7 +83,7 @@ async def run_async_migrations() -> None:
     await connectable.dispose()
 
 def run_migrations_online() -> None:
-    """在"在线"模式下运行迁移"""
+    """Run migrations in 'online' mode."""
     asyncio.run(run_async_migrations())
 
 if context.is_offline_mode():

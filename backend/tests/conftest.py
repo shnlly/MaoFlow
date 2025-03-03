@@ -13,7 +13,7 @@ from app.models.base import Base
 # 使用内存数据库进行测试
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
 
-@pytest_asyncio.fixture
+@pytest_asyncio.fixture(scope="session")
 async def engine():
     """创建测试数据库引擎"""
     engine = create_async_engine(

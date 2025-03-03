@@ -1,4 +1,4 @@
-import { PlatformBridge, UserSettings } from '@shared/components/types';
+import { PlatformBridge, UserSettings, ChatSession, User } from '../../../shared/components/types';
 
 declare global {
   interface Window {
@@ -21,46 +21,115 @@ declare global {
 }
 
 export class ElectronPlatformBridge implements PlatformBridge {
-  // 基本设置
+  private apiBaseUrl = 'http://localhost:8000/api';
+  private testUserId: number | null = null;
+
+  constructor() {
+    // 初始化时获取测试用户ID
+    this.initTestUser();
+  }
+
+  private async initTestUser() {
+    try {
+      const response = await fetch(`${this.apiBaseUrl}/user/test-user`);
+      if (response.ok) {
+        const user: User = await response.json();
+        this.testUserId = user.id;
+      }
+    } catch (error) {
+      console.error('Failed to initialize test user:', error);
+    }
+  }
+
   async loadSettings(): Promise<UserSettings> {
-    const theme = await window.api.settings.getTheme();
-    return {
-      theme,
-      language: 'zh'
-    };
+    if (!this.testUserId) {
+      await this.initTestUser();
+    }
+    try {
+      const response = await fetch(`${this.apiBaseUrl}/settings/${this.testUserId}`);
+      if (!response.ok) {
+        throw new Error('Failed to load settings');
+      }
+      return await response.json();
+    } catch (error) {
+      console.error('Failed to load settings:', error);
+      // 返回默认设置
+      return {
+        theme: 'light',
+        language: 'zh',
+      };
+    }
   }
 
   async saveSettings(settings: UserSettings): Promise<void> {
-    await window.api.settings.setTheme(settings.theme);
+    if (!this.testUserId) {
+      await this.initTestUser();
+    }
+    try {
+      await fetch(`${this.apiBaseUrl}/settings/${this.testUserId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(settings),
+      });
+    } catch (error) {
+      console.error('Failed to save settings:', error);
+      throw error;
+    }
   }
 
-  // 会话管理 - 直接使用后端 API
-  async getSessions() {
-    const response = await fetch('http://localhost:8000/api/sessions');
-    const data = await response.json();
-    return data.map((session: any) => ({
-      ...session,
-      createdAt: new Date(session.createdAt),
-      updatedAt: new Date(session.updatedAt),
-    }));
+  async getSessions(): Promise<ChatSession[]> {
+    if (!this.testUserId) {
+      await this.initTestUser();
+    }
+    try {
+      const response = await fetch(`${this.apiBaseUrl}/chat/sessions/${this.testUserId}`);
+      if (!response.ok) {
+        throw new Error('Failed to get sessions');
+      }
+      return await response.json();
+    } catch (error) {
+      console.error('Failed to get sessions:', error);
+      return [];
+    }
   }
 
-  async createSession() {
-    const response = await fetch('http://localhost:8000/api/sessions', {
-      method: 'POST'
-    });
-    const session = await response.json();
-    return {
-      ...session,
-      createdAt: new Date(session.createdAt),
-      updatedAt: new Date(session.updatedAt),
-    };
+  async deleteSession(sessionId: string): Promise<void> {
+    try {
+      await fetch(`${this.apiBaseUrl}/chat/sessions/${sessionId}`, {
+        method: 'DELETE',
+      });
+    } catch (error) {
+      console.error('Failed to delete session:', error);
+      throw error;
+    }
   }
 
-  async deleteSession(sessionId: string) {
-    await fetch(`http://localhost:8000/api/sessions/${sessionId}`, {
-      method: 'DELETE'
-    });
+  async createSession(): Promise<ChatSession> {
+    if (!this.testUserId) {
+      await this.initTestUser();
+    }
+    try {
+      const response = await fetch(`${this.apiBaseUrl}/chat/sessions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          user_id: this.testUserId,
+          title: '新会话',
+          model: 'gpt-3.5-turbo',
+        }),
+      });
+      if (!response.ok) {
+        throw new Error('Failed to create session');
+      }
+      return await response.json();
+    } catch (error) {
+      console.error('Failed to create session:', error);
+      throw error;
+    }
   }
 
   // 后端服务状态管理

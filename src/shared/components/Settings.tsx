@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { UserSettings } from './types';
 
 interface SettingsProps {
   initialSettings: UserSettings;
-  onSave: (settings: UserSettings) => Promise<void>;
+  onSave: (settings: Partial<UserSettings>) => Promise<void>;
   onClose: () => void;
 }
 
@@ -64,22 +64,51 @@ export const Settings: React.FC<SettingsProps> = ({
               onChange={(e) => setSettings({ ...settings, language: e.target.value })}
               className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
             >
-              <option value="zh">中文</option>
-              <option value="en">English</option>
+              <option value="zh-CN">中文</option>
+              <option value="en-US">English</option>
             </select>
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              API Key
+              通知
             </label>
-            <input
-              type="password"
-              value={settings.apiKey || ''}
-              onChange={(e) => setSettings({ ...settings, apiKey: e.target.value })}
-              className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
-              placeholder="输入你的 API Key"
-            />
+            <div className="flex items-center">
+              <input
+                type="checkbox"
+                checked={settings.notifications_enabled}
+                onChange={(e) => setSettings({ ...settings, notifications_enabled: e.target.checked })}
+                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+              />
+              <span className="ml-2 text-sm text-gray-600 dark:text-gray-400">
+                启用通知
+              </span>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              自定义设置
+            </label>
+            <div className="space-y-2">
+              <div>
+                <label className="text-sm text-gray-600 dark:text-gray-400">字体大小</label>
+                <input
+                  type="number"
+                  value={settings.custom_settings.font_size || 14}
+                  onChange={(e) => setSettings({
+                    ...settings,
+                    custom_settings: {
+                      ...settings.custom_settings,
+                      font_size: parseInt(e.target.value)
+                    }
+                  })}
+                  className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"
+                  min="8"
+                  max="32"
+                />
+              </div>
+            </div>
           </div>
         </div>
 

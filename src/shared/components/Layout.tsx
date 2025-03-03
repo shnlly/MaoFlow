@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Layout as AntLayout, Menu, theme, Button, Avatar } from 'antd';
+import { Layout as AntLayout, Menu, theme, Button, Avatar, message } from 'antd';
 import { 
   MessageOutlined, 
   SettingOutlined, 
@@ -13,69 +13,119 @@ import Chat from './Chat';
 import { User, ChatSession, UserSettings } from './types';
 import { getPlatformBridge } from '../platform';
 
-const { Header, Content, Sider } = AntLayout;
-
-const isElectron = 'electron' in window;
+const { Content, Sider } = AntLayout;
 
 export const Layout: React.FC = () => {
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [currentSession, setCurrentSession] = useState<ChatSession | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
-  const [user, setUser] = useState<User>({
-    id: '1',
-    name: '用户',
-    settings: {
-      theme: 'light',
-      language: 'zh',
-    },
-  });
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
 
   const { token } = theme.useToken();
   const platform = getPlatformBridge();
 
   useEffect(() => {
-    loadSessions();
-    loadSettings();
+    initializeUser();
   }, []);
 
+  useEffect(() => {
+    if (user) {
+      loadSessions();
+      loadSettings();
+    }
+  }, [user]);
+
+  const initializeUser = async () => {
+    try {
+      const response = await fetch('http://localhost:8000/api/user/test-user');
+      if (response.ok) {
+        const userData = await response.json();
+        setUser(userData);
+      }
+    } catch (error) {
+      console.error('Failed to initialize user:', error);
+      message.error('初始化用户信息失败');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const loadSessions = async () => {
-    const loadedSessions = await platform.getSessions();
-    setSessions(loadedSessions);
-    if (loadedSessions.length > 0 && !currentSession) {
-      setCurrentSession(loadedSessions[0]);
+    if (!user) return;
+    try {
+      const loadedSessions = await platform.getSessions();
+      setSessions(loadedSessions);
+      if (loadedSessions.length > 0 && !currentSession) {
+        setCurrentSession(loadedSessions[0]);
+      }
+    } catch (error) {
+      console.error('Failed to load sessions:', error);
+      message.error('加载会话列表失败');
     }
   };
 
   const loadSettings = async () => {
-    const settings = await platform.loadSettings();
-    setUser(prev => ({
-      ...prev,
-      settings,
-    }));
+    if (!user) return;
+    try {
+      const settings = await platform.loadSettings();
+      setUser(prev => prev ? {
+        ...prev,
+        settings,
+      } : null);
+    } catch (error) {
+      console.error('Failed to load settings:', error);
+      message.error('加载用户设置失败');
+    }
   };
 
   const handleNewSession = async () => {
-    const newSession = await platform.createSession();
-    setSessions(prev => [...prev, newSession]);
-    setCurrentSession(newSession);
+    if (!user) return;
+    try {
+      const newSession = await platform.createSession();
+      setSessions(prev => [...prev, newSession]);
+      setCurrentSession(newSession);
+    } catch (error) {
+      console.error('Failed to create session:', error);
+      message.error('创建新会话失败');
+    }
   };
 
   const handleDeleteSession = async (sessionId: string) => {
-    await platform.deleteSession(sessionId);
-    setSessions(prev => prev.filter(s => s.id !== sessionId));
-    if (currentSession?.id === sessionId) {
-      setCurrentSession(sessions[0] || null);
+    try {
+      await platform.deleteSession(sessionId);
+      setSessions(prev => prev.filter(s => s.id !== sessionId));
+      if (currentSession?.id === sessionId) {
+        setCurrentSession(sessions[0] || null);
+      }
+    } catch (error) {
+      console.error('Failed to delete session:', error);
+      message.error('删除会话失败');
     }
   };
 
   const handleSaveSettings = async (settings: UserSettings) => {
-    await platform.saveSettings(settings);
-    setUser(prev => ({
-      ...prev,
-      settings,
-    }));
+    try {
+      await platform.saveSettings(settings);
+      setUser(prev => prev ? {
+        ...prev,
+        settings,
+      } : null);
+      message.success('设置保存成功');
+    } catch (error) {
+      console.error('Failed to save settings:', error);
+      message.error('保存设置失败');
+    }
   };
+
+  if (loading) {
+    return <div>加载中...</div>;
+  }
+
+  if (!user) {
+    return <div>用户初始化失败</div>;
+  }
 
   return (
     <AntLayout style={{ 
