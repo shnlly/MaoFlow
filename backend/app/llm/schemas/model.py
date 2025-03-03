@@ -18,8 +18,13 @@ class LLMModelBase(BaseModel):
     
     model_config = ConfigDict(from_attributes=True, protected_namespaces=())
 
-class LLMModelCreate(LLMModelBase):
-    pass
+class LLMModelCreate(BaseModel):
+    name: str = Field(..., description="模型显示名称")
+    description: Optional[str] = Field(None, description="模型描述")
+    type: str = Field("open_ai_like", description="模型类型，如 open_ai_like, anthropic, local 等")
+    model_name: str = Field(..., description="实际调用的模型名称")
+    api_key: str = Field(..., description="API密钥")
+    base_url: Optional[str] = Field(None, description="API基础URL")
 
 class LLMModelUpdate(BaseModel):
     name: Optional[str] = None
