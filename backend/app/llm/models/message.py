@@ -3,6 +3,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from .conversation  import Conversation
 from core.base_model import Base
 import enum
+from typing import List
 
 class MessageRole(enum.Enum):
     SYSTEM = "system"
@@ -49,5 +50,14 @@ class Message(Base):
         "Conversation",
         foreign_keys=[conversation_id],
         primaryjoin="Message.conversation_id == Conversation.id",
+        lazy="joined"
+    )
+
+    # 添加message_items关系
+    message_items: Mapped[List["MessageItem"]] = relationship(
+        "MessageItem",
+        primaryjoin="Message.id == MessageItem.message_id",
+        foreign_keys="MessageItem.message_id",
+        backref="message",
         lazy="joined"
     )

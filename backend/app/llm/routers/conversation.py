@@ -11,9 +11,10 @@ from ..schemas import (
     ConversationCreate,
     ConversationUpdate,
     ConversationResponse,
-    MessageCreate
+    MessageCreate,
+    MessageResponse
 )
-from ..schemas.message_item import MessageItemCreate
+from ..schemas.message_item import MessageItemCreate, MessageItemResponse
 from ..services.llm_service import create_chat_completion
 from ..models.message import MessageRole, MessageType
 
@@ -21,6 +22,14 @@ router = APIRouter(prefix="/conversations", tags=["对话管理"])
 
 def json_dumps_unicode(obj):
     return json.dumps(obj, ensure_ascii=False)
+
+def clean_text(text: str) -> str:
+    """清理文本，去除多余的换行符和空白字符"""
+    # 去除首尾的空白字符
+    text = text.strip()
+    # 将多个连续的换行符替换为单个换行符
+    text = '\n'.join(line.strip() for line in text.split('\n') if line.strip())
+    return text
 
 # 会话相关路由
 @router.post("", response_model=ConversationResponse)
@@ -57,7 +66,16 @@ async def query_conversation(
         content=query,
         role=MessageRole.USER
     )
-    await message_service.create_message(user_message)
+    user_message_obj = await message_service.create_message(user_message)
+    
+    # 为用户消息创建message_item
+    user_item_data = MessageItemCreate(
+        message_id=user_message_obj.id,
+        conversation_id=conversation_id,
+        content=clean_text(query),
+        type="message"
+    )
+    await message_service.create_message_item(user_item_data)
     
     # 创建助手消息
     assistant_message = MessageCreate(
@@ -65,7 +83,7 @@ async def query_conversation(
         user_id=conversation.user_id,
         role=MessageRole.ASSISTANT
     )
-    message = await message_service.create_message(assistant_message)
+    assistant_message_obj = await message_service.create_message(assistant_message)
     
     async def generate_response() -> AsyncGenerator[str, None]:
         try:
@@ -99,16 +117,33 @@ async def query_conversation(
                     if chunk_type in collected_contents:
                         collected_contents[chunk_type].append(chunk_content)
                     
+                    # 构建完整的消息块
+                    message_block = {
+                        "type": chunk_type,
+                        "content": chunk_content,
+                        "conversation_id": conversation_id,
+                        "message_id": message_id
+                    }
+                    
                     # 流式返回给客户端
-                    yield f"data: {json_dumps_unicode(chunk)}\n\n"
+                    yield f"data: {json_dumps_unicode(message_block)}\n\n"
             
             # 存储各类型的消息内容
             for item_type, contents in collected_contents.items():
                 if contents:
+                    # 对于 message 类型，更新助手消息的内容
+                    if item_type == "message":
+                        # 重新获取消息对象以确保它在当前会话中
+                        current_message = await message_service.get_message(assistant_message_obj.id)
+                        if current_message:
+                            current_message.content = clean_text("".join(contents))
+                            await message_service.update_message(current_message)
+                    
+                    # 存储消息项，使用assistant_message_obj.id作为message_id
                     item_data = MessageItemCreate(
-                        message_id=message_id,
+                        message_id=assistant_message_obj.id,  # 使用助手消息的ID
                         conversation_id=conversation_id,
-                        content="".join(contents),
+                        content=clean_text("".join(contents)),
                         type=item_type
                     )
                     await message_service.create_message_item(item_data)
@@ -116,12 +151,13 @@ async def query_conversation(
             # 更新会话的最后消息时间
             await conversation_service.update_conversation_last_message(conversation_id)
             
-            yield "data: [DONE]\n\n"
+            # 发送完成消息
+            yield f"data: {json_dumps_unicode({'type': 'done', 'conversation_id': conversation_id, 'message_id': message_id})}\n\n"
                     
         except Exception as e:
             error_message = f"发生错误: {str(e)}"
-            yield f"data: {json_dumps_unicode({'type': 'error', 'content': error_message})}\n\n"
-            yield "data: [DONE]\n\n"
+            yield f"data: {json_dumps_unicode({'type': 'error', 'content': error_message, 'conversation_id': conversation_id, 'message_id': message_id})}\n\n"
+            yield f"data: {json_dumps_unicode({'type': 'done', 'conversation_id': conversation_id, 'message_id': message_id})}\n\n"
 
     return StreamingResponse(
         generate_response(),
@@ -179,3 +215,12 @@ async def delete_conversation(
     conversation_service = ConversationService(db)
     await conversation_service.delete_conversation(conversation_id)
     return {"message": "会话已删除"}
+
+@router.get("/{conversation_id}/messages", response_model=List[MessageResponse])
+async def get_conversation_messages(
+    conversation_id: str,
+    db: AsyncSession = Depends(get_db)
+):
+    """获取会话的历史消息列表"""
+    message_service = MessageService(db)
+    return await message_service.get_conversation_messages_with_items(conversation_id)

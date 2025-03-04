@@ -1,5 +1,7 @@
-from typing import Optional
+from typing import Optional, List
 from pydantic import BaseModel
+
+from app.llm.schemas.message_item import MessageItemResponse
 from app.llm.models.message import MessageRole, MessageType
 
 class MessageBase(BaseModel):
@@ -18,6 +20,7 @@ class MessageResponse(MessageBase):
     user_id: str
     tokens: int = 0
     processing_time: float = 0.0
+    message_items: List[MessageItemResponse] = []
 
     class Config:
         from_attributes = True 

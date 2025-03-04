@@ -16,3 +16,5 @@ class MessageItem(Base):
 
     # 排序
     order: Mapped[int] = mapped_column(Integer, default=0)
+
+    # message关系会通过Message模型中的backref自动创建
