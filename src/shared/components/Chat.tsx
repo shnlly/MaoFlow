@@ -9,6 +9,7 @@ import python from 'react-syntax-highlighter/dist/esm/languages/hljs/python';
 import javascript from 'react-syntax-highlighter/dist/esm/languages/hljs/javascript';
 import typescript from 'react-syntax-highlighter/dist/esm/languages/hljs/typescript';
 import bash from 'react-syntax-highlighter/dist/esm/languages/hljs/bash';
+import { Message, MessageType, MessageItem } from './types';
 
 // 注册常用的编程语言
 SyntaxHighlighter.registerLanguage('python', python);
@@ -17,28 +18,6 @@ SyntaxHighlighter.registerLanguage('typescript', typescript);
 SyntaxHighlighter.registerLanguage('bash', bash);
 
 window.console.log('=== Chat 组件模块加载 ===');
-
-// 消息类型定义
-type MessageType = 'think' | 'message' | 'tool';
-
-interface ThoughtItem {
-  type: MessageType;
-  content: string;
-  timestamp: number;
-}
-
-interface Message {
-  content: string;
-  role: 'user' | 'assistant';
-  type?: MessageType;
-  thoughts?: ThoughtItem[];
-}
-
-// 流式响应数据结构
-interface StreamChunk {
-  type?: MessageType;
-  content: string;
-}
 
 // 消息类型配置
 const MESSAGE_TYPE_CONFIG = {
@@ -97,13 +76,14 @@ const Chat: React.FC<ChatProps> = ({ sessionId }) => {
 
   const loadSessionMessages = async () => {
     try {
-      const response = await fetch(`http://localhost:8000/api/chat/history/${sessionId}`);
+      const response = await fetch(`http://localhost:8000/api/conversations/${sessionId}/messages`);
       if (response.ok) {
         const history = await response.json();
         setMessages(history);
       }
     } catch (error) {
       console.error('Failed to load session messages:', error);
+      message.error('加载历史消息失败');
     }
   };
 
@@ -117,16 +97,24 @@ const Chat: React.FC<ChatProps> = ({ sessionId }) => {
     });
   };
 
-  const renderAssistantMessage = (thoughts: ThoughtItem[]) => {
-    const items = thoughts.map(thought => ({
-      title: MESSAGE_TYPE_CONFIG[thought.type].title,
-      description: MESSAGE_TYPE_CONFIG[thought.type].description,
-      status: MESSAGE_TYPE_CONFIG[thought.type].status,
-      icon: MESSAGE_TYPE_CONFIG[thought.type].icon,
+  const renderAssistantMessage = (message: Message) => {
+    if (!message.message_items || message.message_items.length === 0) {
+      return (
+        <Typography.Text>
+          <ReactMarkdown>{message.content}</ReactMarkdown>
+        </Typography.Text>
+      );
+    }
+
+    const items = message.message_items.map(item => ({
+      title: MESSAGE_TYPE_CONFIG[item.type].title,
+      description: MESSAGE_TYPE_CONFIG[item.type].description,
+      status: MESSAGE_TYPE_CONFIG[item.type].status,
+      icon: MESSAGE_TYPE_CONFIG[item.type].icon,
       content: (
         <Typography>
           <Typography.Paragraph>
-            {thought.type === 'message' ? (
+            {item.type === 'message' ? (
               <ReactMarkdown
                 components={{
                   code({ className, children }) {
@@ -167,10 +155,10 @@ const Chat: React.FC<ChatProps> = ({ sessionId }) => {
                   }
                 }}
               >
-                {thought.content}
+                {item.content}
               </ReactMarkdown>
             ) : (
-              thought.content.split('\n').map((line, index) => (
+              item.content.split('\n').map((line, index) => (
                 <div key={index}>{line}</div>
               ))
             )}
@@ -192,10 +180,14 @@ const Chat: React.FC<ChatProps> = ({ sessionId }) => {
 
   const renderMessageContent = (msg: Message) => {
     if (msg.role === 'user') {
-      return <Typography.Text>{msg.content}</Typography.Text>;
+      return (
+        <Typography.Text>
+          {msg.message_items?.[0]?.content || msg.content}
+        </Typography.Text>
+      );
     }
 
-    return msg.thoughts ? renderAssistantMessage(msg.thoughts) : null;
+    return renderAssistantMessage(msg);
   };
 
   const renderMessage = (msg: Message) => {
@@ -205,7 +197,7 @@ const Chat: React.FC<ChatProps> = ({ sessionId }) => {
         <Flex align="start" justify={isUser ? 'flex-end' : 'flex-start'}>
           {isUser ? (
             <Bubble
-              content={msg.content}
+              content={msg.message_items?.[0]?.content || msg.content}
               placement="end"
               variant="filled"
               shape="round"
@@ -223,7 +215,7 @@ const Chat: React.FC<ChatProps> = ({ sessionId }) => {
                 }} />
               }
             >
-              <Typography.Text>{msg.content}</Typography.Text>
+              <Typography.Text>{msg.message_items?.[0]?.content || msg.content}</Typography.Text>
             </Bubble>
           ) : (
             <div style={{ width: '100%' }}>
@@ -239,11 +231,47 @@ const Chat: React.FC<ChatProps> = ({ sessionId }) => {
     try {
       setIsLoading(true);
       setInputValue('');
-      setMessages(prev => [...prev, { content: text, role: 'user' }]);
       
-      const response = await fetch(`http://localhost:8000/api/chat/${sessionId}?query=${encodeURIComponent(text)}`, {
-        method: 'GET',
-      });
+      // 添加用户消息到界面
+      const userMessage: Message = {
+        id: '',
+        role: 'user',
+        content: text,
+        conversation_id: sessionId,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        message_items: [{
+          id: '',
+          type: 'message',
+          content: text,
+          timestamp: new Date().toISOString(),
+          message_id: '',
+          conversation_id: sessionId
+        }]
+      };
+      
+      setMessages(prev => [...prev, userMessage]);
+      
+      // 创建助手消息占位符
+      const assistantMessage: Message = {
+        id: '',
+        role: 'assistant',
+        content: '',
+        conversation_id: sessionId,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        message_items: []
+      };
+      
+      setMessages(prev => [...prev, assistantMessage]);
+      
+      // 发送请求
+      const response = await fetch(
+        `http://localhost:8000/api/conversations/${sessionId}/query?query=${encodeURIComponent(text)}`,
+        {
+          method: 'POST',
+        }
+      );
 
       if (!response.ok) {
         throw new Error('请求失败');
@@ -251,22 +279,13 @@ const Chat: React.FC<ChatProps> = ({ sessionId }) => {
 
       const reader = response.body?.getReader();
       if (!reader) {
-        throw new Error('无法读取响应');
+        throw new Error('无法读取响应流');
       }
 
-      let currentMessage: Message = { 
-        content: '', 
-        role: 'assistant',
-        thoughts: []
-      };
-
-      let currentThought: ThoughtItem = {
-        type: 'think',
-        content: '',
-        timestamp: Date.now()
-      };
-
-      setMessages(prev => [...prev, currentMessage]);
+      let currentMessage = '';
+      let currentType: MessageType = 'message';
+      let thinkContent = '';
+      let messageContent = '';
 
       while (true) {
         const { done, value } = await reader.read();
@@ -274,160 +293,106 @@ const Chat: React.FC<ChatProps> = ({ sessionId }) => {
 
         const chunk = new TextDecoder().decode(value);
         const lines = chunk.split('\n');
-        
+
         for (const line of lines) {
-          if (!line || !line.startsWith('data: ')) continue;
-          
-          // 检查是否是结束标记
-          if (line.includes('[DONE]')) {
-            console.log('Stream completed');
-            continue;
-          }
-
-          try {
-            const data: StreamChunk = JSON.parse(line.slice(6));
-            
-            // 如果类型发生变化，创建新的思维节点
-            if (data.type && data.type !== currentThought.type) {
-              if (currentThought.content) {
-                currentMessage = {
-                  ...currentMessage,
-                  thoughts: [...(currentMessage.thoughts || []), { ...currentThought }]
-                };
+          if (line.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(line.slice(6));
+              
+              if (data.type === 'done') {
+                setIsLoading(false);
+                break;
               }
-              currentThought = {
-                type: data.type,
-                content: '',
-                timestamp: Date.now()
-              };
-            }
-
-            // 累积当前类型的内容
-            currentThought.content += data.content;
-
-            // 更新消息
-            setMessages(prev => {
-              const newMessages = [...prev];
-              const lastMessage = newMessages[newMessages.length - 1];
               
-              // 获取已有的思维节点，但排除掉与当前节点相同类型的
-              const existingThoughts = (lastMessage.thoughts || []).filter(
-                t => t.type !== currentThought.type
-              );
+              if (data.type === 'error') {
+                message.error(data.content);
+                setIsLoading(false);
+                break;
+              }
               
-              newMessages[newMessages.length - 1] = {
-                ...currentMessage,
-                thoughts: [...existingThoughts, { ...currentThought }]
-              };
-              return newMessages;
-            });
-          } catch (e) {
-            if (!line.includes('[DONE]')) {
-              console.error('解析响应数据失败:', e, '数据:', line);
+              // 更新当前消息类型
+              if (data.type) {
+                currentType = data.type;
+              }
+              
+              // 根据类型分别累积内容
+              if (currentType === 'think') {
+                thinkContent += data.content;
+              } else if (currentType === 'message') {
+                messageContent += data.content;
+              }
+              
+              // 更新消息列表
+              setMessages(prev => {
+                const newMessages = [...prev];
+                const lastMessage = newMessages[newMessages.length - 1];
+                
+                if (lastMessage.role === 'assistant') {
+                  // 更新或创建 message_items
+                  const messageItems: MessageItem[] = [];
+                  
+                  // 添加 think 内容
+                  if (thinkContent) {
+                    messageItems.push({
+                      id: '',
+                      type: 'think',
+                      content: thinkContent,
+                      timestamp: new Date().toISOString(),
+                      message_id: lastMessage.id,
+                      conversation_id: sessionId
+                    });
+                  }
+                  
+                  // 添加 message 内容
+                  if (messageContent) {
+                    messageItems.push({
+                      id: '',
+                      type: 'message',
+                      content: messageContent,
+                      timestamp: new Date().toISOString(),
+                      message_id: lastMessage.id,
+                      conversation_id: sessionId
+                    });
+                  }
+                  
+                  lastMessage.message_items = messageItems;
+                  lastMessage.content = messageContent || thinkContent;
+                }
+                
+                return newMessages;
+              });
+            } catch (error) {
+              console.error('Error parsing chunk:', error);
             }
           }
         }
       }
-
-      // 确保最后一个思维节点被添加到消息中
-      if (currentThought.content) {
-        setMessages(prev => {
-          const newMessages = [...prev];
-          const lastMessage = newMessages[newMessages.length - 1];
-          
-          // 获取已有的思维节点，但排除掉与当前节点相同类型的
-          const existingThoughts = (lastMessage.thoughts || []).filter(
-            t => t.type !== currentThought.type
-          );
-          
-          newMessages[newMessages.length - 1] = {
-            ...lastMessage,
-            thoughts: [...existingThoughts, { ...currentThought }]
-          };
-          return newMessages;
-        });
-      }
+      
+      setIsLoading(false);
     } catch (error) {
-      console.error('Error:', error);
-      message.error('发生错误，请稍后重试');
-    } finally {
+      console.error('Error in handleRequest:', error);
+      message.error('发送消息失败');
       setIsLoading(false);
     }
   };
 
   return (
-    <App>
-      <Flex vertical gap="middle" style={{ 
-        height: '100vh', 
-        padding: '20px',
-        backgroundColor: '#f5f5f5'
-      }}>
-        <div style={{ 
-          flex: 1, 
-          overflow: 'auto',
-          padding: '20px',
-          borderRadius: '8px',
-          backgroundColor: '#fff',
-          boxShadow: '0 2px 8px rgba(0,0,0,0.06)'
-        }}>
-          {messages.map((msg, index) => (
-            <div key={index} style={{ 
-              marginBottom: 24,
-              animation: 'fadeIn 0.3s ease-in-out'
-            }}>
-              {renderMessage(msg)}
-            </div>
-          ))}
-        </div>
-        
-        {messages.length === 0 && (
-          <div onClick={(e) => {
-            const target = e.target as HTMLElement;
-            const promptItem = target.closest('[data-key]');
-            if (promptItem) {
-              const key = promptItem.getAttribute('data-key');
-              const prompt = suggestedPrompts.find(p => p.key === key);
-              if (prompt) {
-                handleRequest(prompt.description);
-              }
-            }
-          }}>
-            <Prompts
-              title="👋 你可以这样问我："
-              items={suggestedPrompts}
-              vertical
-              style={{ marginBottom: 20 }}
-            />
+    <Flex vertical style={{ height: '100%' }}>
+      <Flex flex={1} vertical style={{ overflow: 'auto', padding: '16px' }}>
+        {messages.map((msg, index) => (
+          <div key={msg.id || index}>
+            {renderMessage(msg)}
           </div>
-        )}
-
-        {isLoading && (
-          <ThoughtChain
-            items={[
-              {
-                title: 'AI 正在思考',
-                status: 'pending',
-                icon: <LoadingOutlined />,
-                content: '正在生成回答...',
-              },
-            ]}
-          />
-        )}
-
-        <Sender 
-          value={inputValue}
-          onChange={setInputValue}
-          onSubmit={handleRequest}
-          disabled={isLoading}
-          placeholder={isLoading ? "AI 正在思考中..." : "请输入您的问题"}
-          loading={isLoading}
-          onCancel={() => {
-            setIsLoading(false);
-            message.info('已取消发送');
-          }}
-        />
+        ))}
       </Flex>
-    </App>
+      <Sender
+        value={inputValue}
+        onChange={setInputValue}
+        onSubmit={handleRequest}
+        loading={isLoading}
+        placeholder="输入消息..."
+      />
+    </Flex>
   );
 };
 

@@ -31,12 +31,13 @@ export interface ChatSession {
 
 export type MessageType = 'think' | 'message' | 'tool';
 
-export interface ThoughtItem {
+export interface MessageItem {
   id: string;
-  type: 'think' | 'message' | 'tool';
+  type: MessageType;
   content: string;
   timestamp: string;
   message_id: string;
+  conversation_id: string;
 }
 
 export interface Message {
@@ -47,12 +48,14 @@ export interface Message {
   created_at: string;
   updated_at: string;
   tokens?: number;
-  thoughts?: ThoughtItem[];
+  message_items?: MessageItem[];
 }
 
 export interface StreamChunk {
   type?: MessageType;
   content: string;
+  conversation_id: string;
+  message_id: string;
 }
 
 export interface PlatformBridge {
