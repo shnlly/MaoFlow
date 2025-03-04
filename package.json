@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "electron-vite dev",
     "dev:web": "cd web-ui && vite",
-    "dev:api": "cd backend && python -m uvicorn app.main:app --reload",
+    "dev:api": "cd backend && python -m uvicorn app.main:app --reload --port 17349",
     "build": "source $(conda info --base)/etc/profile.d/conda.sh && conda activate MaoFlow && electron-vite build",
     "build:web": "cd web-ui && vite build",
     "build:electron": "source $(conda info --base)/etc/profile.d/conda.sh && conda activate MaoFlow && electron-builder",
@@ -15,7 +15,7 @@
     "build:mac": "npm run build && electron-builder --mac",
     "build:linux": "npm run build && electron-builder --linux",
     "build:backend": "source $(conda info --base)/etc/profile.d/conda.sh && conda activate MaoFlow12 && cd backend && pyinstaller run.spec",
-    "build:all:mac": "npm run build:backend && npm run build && mkdir -p dist/mac/MaoFlow.app/Contents/Resources/backend && cp -f backend/dist/maoflow dist/mac/MaoFlow.app/Contents/Resources/backend/ && chmod +x dist/mac/MaoFlow.app/Contents/Resources/backend/maoflow && electron-builder --mac",
+    "build:all:mac": "npm run build:backend && npm run build && electron-builder --mac",
     "lint": "eslint . --ext .js,.jsx,.ts,.tsx",
     "lint:fix": "eslint . --ext .js,.jsx,.ts,.tsx --fix",
     "format": "prettier --write ."

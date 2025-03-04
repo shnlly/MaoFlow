@@ -12,6 +12,7 @@ import { Settings } from './Settings';
 import Chat from './Chat';
 import { User, ChatSession, UserSettings } from './types';
 import { getPlatformBridge } from '../platform';
+import { API_BASE_URL, API_PREFIX } from '../config';
 
 const { Content, Sider } = AntLayout;
 
@@ -41,7 +42,7 @@ export const Layout: React.FC = () => {
 
   const initializeUser = async () => {
     try {
-      const response = await fetch('http://localhost:8000/api/user/test-user');
+      const response = await fetch(`${API_BASE_URL}${API_PREFIX}/user/test-user`);
       if (response.ok) {
         const userData = await response.json();
         setUser(userData);
@@ -57,7 +58,7 @@ export const Layout: React.FC = () => {
   const loadSessions = async () => {
     if (!user) return;
     try {
-      const response = await fetch(`http://localhost:8000/api/conversations/user/${user.id}`);
+      const response = await fetch(`${API_BASE_URL}${API_PREFIX}/conversations/user/${user.id}`);
       if (!response.ok) throw new Error('Failed to load sessions');
       const loadedSessions = await response.json();
       setSessions(loadedSessions);
@@ -72,7 +73,7 @@ export const Layout: React.FC = () => {
 
   const loadModels = async () => {
     try {
-      const response = await fetch('http://localhost:8000/api/models');
+      const response = await fetch(`${API_BASE_URL}${API_PREFIX}/models`);
       if (!response.ok) throw new Error('Failed to load models');
       const data = await response.json();
       setModels(data.items);
@@ -102,8 +103,13 @@ export const Layout: React.FC = () => {
   };
 
   const handleNewSession = async () => {
-    if (!user || !defaultModel) return;
+    if (!user || !defaultModel) {
+      message.error('用户未初始化或未加载默认模型');
+      return;
+    }
+    
     try {
+      console.log('Creating new session with model:', defaultModel);
       const newSessionData = {
         title: "新会话",
         user_id: user.id,
@@ -116,26 +122,43 @@ export const Layout: React.FC = () => {
           custom_settings: {}
         }
       };
-      const response = await fetch('http://localhost:8000/api/conversations', {
+      
+      console.log('Sending request to:', `${API_BASE_URL}${API_PREFIX}/conversations`);
+      console.log('Request data:', JSON.stringify(newSessionData, null, 2));
+      
+      const response = await fetch(`${API_BASE_URL}${API_PREFIX}/conversations`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(newSessionData),
       });
-      if (!response.ok) throw new Error('Failed to create session');
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        console.error('Server response:', {
+          status: response.status,
+          statusText: response.statusText,
+          data: errorData
+        });
+        throw new Error(`Failed to create session: ${response.statusText}`);
+      }
+
       const newSession = await response.json();
+      console.log('New session created:', newSession);
+      
       setSessions(prev => [...prev, newSession]);
       setCurrentSession(newSession);
+      message.success('新会话创建成功');
     } catch (error) {
       console.error('Failed to create session:', error);
-      message.error('创建新会话失败');
+      message.error(`创建新会话失败: ${error instanceof Error ? error.message : '未知错误'}`);
     }
   };
 
   const handleDeleteSession = async (sessionId: string) => {
     try {
-      const response = await fetch(`http://localhost:8000/api/conversations/${sessionId}`, {
+      const response = await fetch(`${API_BASE_URL}${API_PREFIX}/conversations/${sessionId}`, {
         method: 'DELETE',
       });
       if (!response.ok) throw new Error('Failed to delete session');

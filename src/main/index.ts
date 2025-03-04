@@ -11,7 +11,7 @@ function startPythonBackend(): void {
   // 确定后端可执行文件的路径
   let backendPath: string
   if (app.isPackaged) {
-    // 打包后的路径
+    // 打包后的路径 - 使用 extraResources 路径
     backendPath = join(process.resourcesPath, 'backend', 'maoflow')
   } else {
     // 开发环境路径
@@ -32,7 +32,7 @@ function startPythonBackend(): void {
     })
   } else {
     // 在开发环境中使用 uvicorn
-    pythonProcess = spawn('python', ['-m', 'uvicorn', 'app.main:app', '--reload'], {
+    pythonProcess = spawn('python', ['-m', 'uvicorn', 'app.main:app', '--reload', '--port', '17349'], {
       cwd: backendPath
     })
   }

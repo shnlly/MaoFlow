@@ -1,4 +1,5 @@
 import { PlatformBridge, UserSettings, ChatSession, User } from '../../../shared/components/types';
+import { API_BASE_URL, API_PREFIX } from '../../../shared/config';
 
 declare global {
   interface Window {
@@ -21,10 +22,11 @@ declare global {
 }
 
 export class ElectronPlatformBridge implements PlatformBridge {
-  private apiBaseUrl = 'http://localhost:8000/api';
+  private apiBaseUrl: string;
   private testUserId: number | null = null;
 
   constructor() {
+    this.apiBaseUrl = `${API_BASE_URL}${API_PREFIX}`;
     // 初始化时获取测试用户ID
     this.initTestUser();
   }

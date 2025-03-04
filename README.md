@@ -3,7 +3,6 @@
 一个基于 Electron + FastAPI + React 的跨平台应用。
 
 ## 项目结构
-
 ```
 MaoFlow/
 ├── backend/               # Python FastAPI 后端
@@ -106,3 +105,4 @@ npm build:electron
 ## 许可证
 
 [MIT License](LICENSE)
+

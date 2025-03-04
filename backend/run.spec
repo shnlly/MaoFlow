@@ -11,8 +11,16 @@ a = Analysis(
     datas=[
         ('.env.development', '.'),  # 添加环境配置文件
         ('maoflow.db', '.'),  # 添加数据库文件
+        ('alembic.ini', '.'),  # 添加 Alembic 配置文件
+        ('alembic', 'alembic'),  # 添加迁移脚本目录
     ],
     hiddenimports=[
+        'alembic',
+        'alembic.config',
+        'alembic.command',
+        'alembic.runtime.migration',
+        'alembic.ddl.impl',
+        'alembic.ddl.base',
         'pydantic._internal._config',
         'pydantic._internal._fields',
         'uvicorn.protocols.websockets',

@@ -24,7 +24,7 @@ class Settings(BaseSettings):
     # 基础配置
     APP_NAME: str = "MaoFlow"
     DEBUG: bool = False
-    API_PREFIX: str = "/api"
+    API_PREFIX: str = "/api/v1"
     API_V1_STR: str = "/api/v1"
     HOST: str = "localhost"
     PORT: int = 17349

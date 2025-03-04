@@ -1,4 +1,5 @@
 import { UserSettings } from '../components/types';
+import { API_BASE_URL, API_PREFIX } from '../config';
 
 export interface User {
   id: string;
@@ -14,12 +15,12 @@ export interface User {
 export class UserService {
   private baseUrl: string;
 
-  constructor(baseUrl: string) {
-    this.baseUrl = baseUrl;
+  constructor() {
+    this.baseUrl = `${API_BASE_URL}${API_PREFIX}`;
   }
 
   async getDefaultUser(): Promise<User> {
-    const response = await fetch(`${this.baseUrl}/api/user/default`);
+    const response = await fetch(`${this.baseUrl}/user/default`);
     if (!response.ok) {
       throw new Error('Failed to fetch default user');
     }
@@ -27,7 +28,7 @@ export class UserService {
   }
 
   async getUserSettings(userId: string): Promise<UserSettings> {
-    const response = await fetch(`${this.baseUrl}/api/user/${userId}/settings`);
+    const response = await fetch(`${this.baseUrl}/user/${userId}/settings`);
     if (!response.ok) {
       throw new Error('Failed to fetch user settings');
     }
@@ -35,7 +36,7 @@ export class UserService {
   }
 
   async updateUserSettings(userId: string, settings: Partial<UserSettings>): Promise<UserSettings> {
-    const response = await fetch(`${this.baseUrl}/api/user/${userId}/settings`, {
+    const response = await fetch(`${this.baseUrl}/user/${userId}/settings`, {
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',

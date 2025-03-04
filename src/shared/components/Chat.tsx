@@ -10,6 +10,7 @@ import javascript from 'react-syntax-highlighter/dist/esm/languages/hljs/javascr
 import typescript from 'react-syntax-highlighter/dist/esm/languages/hljs/typescript';
 import bash from 'react-syntax-highlighter/dist/esm/languages/hljs/bash';
 import { Message, MessageType, MessageItem } from './types';
+import { API_BASE_URL, API_PREFIX } from '../config';
 
 // 注册常用的编程语言
 SyntaxHighlighter.registerLanguage('python', python);
@@ -59,7 +60,7 @@ const Chat: React.FC<ChatProps> = ({ sessionId }) => {
 
   const loadSessionMessages = async () => {
     try {
-      const response = await fetch(`http://localhost:8000/api/conversations/${sessionId}/messages`);
+      const response = await fetch(`${API_BASE_URL}${API_PREFIX}/conversations/${sessionId}/messages`);
       if (response.ok) {
         const history = await response.json();
         setMessages(history);
@@ -277,7 +278,7 @@ const Chat: React.FC<ChatProps> = ({ sessionId }) => {
       
       // 发送请求
       const response = await fetch(
-        `http://localhost:8000/api/conversations/${sessionId}/query?query=${encodeURIComponent(text)}`,
+        `${API_BASE_URL}${API_PREFIX}/conversations/${sessionId}/query?query=${encodeURIComponent(text)}`,
         {
           method: 'POST',
         }
@@ -391,7 +392,7 @@ const Chat: React.FC<ChatProps> = ({ sessionId }) => {
       const formData = new FormData();
       formData.append('file', file);
       
-      const response = await fetch(`http://localhost:8000/api/conversations/${sessionId}/upload`, {
+      const response = await fetch(`${API_BASE_URL}${API_PREFIX}/conversations/${sessionId}/upload`, {
         method: 'POST',
         body: formData,
       });

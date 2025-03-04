@@ -2,6 +2,8 @@ import { resolve } from 'path'
 import { defineConfig, externalizeDepsPlugin } from 'electron-vite'
 import react from '@vitejs/plugin-react'
 
+const API_PORT = 17349;
+
 export default defineConfig({
   main: {
     plugins: [externalizeDepsPlugin()]
@@ -29,7 +31,7 @@ export default defineConfig({
       port: 5173,
       proxy: {
         '/api': {
-          target: 'http://localhost:8000',
+          target: `http://localhost:${API_PORT}`,
           changeOrigin: true
         }
       }
