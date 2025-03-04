@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Bubble, Sender, ThoughtChain } from '@ant-design/x';
-import { App, Flex, Typography, Card, Space } from 'antd';
-import { CopyOutlined, RobotOutlined, UserOutlined, LoadingOutlined } from '@ant-design/icons';
+import { Bubble, Sender, ThoughtChain, Attachments } from '@ant-design/x';
+import { App, Flex, Typography, Card, Space, UploadFile } from 'antd';
+import { CopyOutlined, RobotOutlined, UserOutlined, LoadingOutlined, FileOutlined } from '@ant-design/icons';
 import ReactMarkdown from 'react-markdown';
 import { Light as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vs2015 } from 'react-syntax-highlighter/dist/esm/styles/hljs';
@@ -49,6 +49,7 @@ const Chat: React.FC<ChatProps> = ({ sessionId }) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [inputValue, setInputValue] = useState('');
+  const [attachments, setAttachments] = useState<UploadFile[]>([]);
   const { message } = App.useApp();
 
   // 当 sessionId 改变时加载历史消息
@@ -385,6 +386,48 @@ const Chat: React.FC<ChatProps> = ({ sessionId }) => {
     }
   };
 
+  const handleFileUpload = async (file: File) => {
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      const response = await fetch(`http://localhost:8000/api/conversations/${sessionId}/upload`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error('文件上传失败');
+      }
+
+      const result = await response.json();
+      message.success('文件上传成功');
+      
+      // 添加文件消息到对话
+      const fileMessage: Message = {
+        id: '',
+        role: 'user',
+        content: `[文件] ${file.name}`,
+        conversation_id: sessionId,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        message_items: [{
+          id: '',
+          type: 'message',
+          content: `[文件] ${file.name}`,
+          timestamp: new Date().toISOString(),
+          message_id: '',
+          conversation_id: sessionId
+        }]
+      };
+      
+      setMessages(prev => [...prev, fileMessage]);
+    } catch (error) {
+      console.error('Error uploading file:', error);
+      message.error('文件上传失败');
+    }
+  };
+
   return (
     <Flex vertical style={{ height: '100%', padding: '24px' }}>
       <Flex vertical flex={1} style={{ overflow: 'auto' }}>
@@ -395,6 +438,30 @@ const Chat: React.FC<ChatProps> = ({ sessionId }) => {
         ))}
       </Flex>
       <Flex vertical gap="middle" style={{ marginTop: '24px' }}>
+        <Attachments
+          items={attachments}
+          onChange={(info) => {
+            const fileList = info.fileList;
+            setAttachments(fileList);
+            if (fileList.length > 0) {
+              const lastFile = fileList[fileList.length - 1];
+              if (lastFile.originFileObj) {
+                handleFileUpload(lastFile.originFileObj);
+              }
+            }
+          }}
+          placeholder={{
+            icon: <FileOutlined style={{ fontSize: 24, color: '#1677ff' }} />,
+            title: '点击或拖拽文件到此处上传',
+            description: '支持图片、文档、音频等文件类型'
+          }}
+          style={{
+            borderRadius: '12px',
+            border: '1px dashed #d9d9d9',
+            padding: '16px',
+            marginBottom: '16px'
+          }}
+        />
         <Sender
           value={inputValue}
           onChange={(value) => {

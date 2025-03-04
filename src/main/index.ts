@@ -2,15 +2,40 @@ import { app, shell, BrowserWindow, ipcMain } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { spawn } from 'child_process'
+import { existsSync } from 'fs'
 
 let pythonProcess: any = null
 let mainWindow: BrowserWindow | null = null
 
 function startPythonBackend(): void {
+  // 确定后端可执行文件的路径
+  let backendPath: string
+  if (app.isPackaged) {
+    // 打包后的路径
+    backendPath = join(process.resourcesPath, 'backend', 'maoflow')
+  } else {
+    // 开发环境路径
+    backendPath = join(__dirname, '../../backend')
+  }
+
   // 启动 Python 后端服务
-  pythonProcess = spawn('python', ['-m', 'uvicorn', 'app.main:app', '--reload'], {
-    cwd: join(__dirname, '../../backend')
-  })
+  if (app.isPackaged) {
+    // 检查可执行文件是否存在
+    if (!existsSync(backendPath)) {
+      console.error(`Backend executable not found at: ${backendPath}`)
+      app.quit()
+      return
+    }
+    // 在打包环境中直接运行可执行文件
+    pythonProcess = spawn(backendPath, [], {
+      stdio: ['pipe', 'pipe', 'pipe']
+    })
+  } else {
+    // 在开发环境中使用 uvicorn
+    pythonProcess = spawn('python', ['-m', 'uvicorn', 'app.main:app', '--reload'], {
+      cwd: backendPath
+    })
+  }
 
   pythonProcess.stdout.on('data', (data: any) => {
     console.log(`Python Backend: ${data}`)
@@ -18,6 +43,10 @@ function startPythonBackend(): void {
 
   pythonProcess.stderr.on('data', (data: any) => {
     console.error(`Python Backend Error: ${data}`)
+  })
+
+  pythonProcess.on('error', (err: Error) => {
+    console.error('Failed to start Python backend:', err)
   })
 }
 
