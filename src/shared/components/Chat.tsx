@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Bubble, Sender, Prompts, ThoughtChain } from '@ant-design/x';
-import { App, Flex, Typography, Card } from 'antd';
+import { Bubble, Sender, ThoughtChain } from '@ant-design/x';
+import { App, Flex, Typography, Card, Space } from 'antd';
 import { CopyOutlined, RobotOutlined, UserOutlined, LoadingOutlined } from '@ant-design/icons';
 import ReactMarkdown from 'react-markdown';
 import { Light as SyntaxHighlighter } from 'react-syntax-highlighter';
@@ -40,24 +40,6 @@ const MESSAGE_TYPE_CONFIG = {
     status: 'pending' as const
   }
 };
-
-const suggestedPrompts = [
-  {
-    key: '1',
-    icon: <RobotOutlined style={{ color: '#1677ff' }} />,
-    description: '你能做什么？',
-  },
-  {
-    key: '2',
-    icon: <RobotOutlined style={{ color: '#1677ff' }} />,
-    description: '给我讲个故事',
-  },
-  {
-    key: '3',
-    icon: <RobotOutlined style={{ color: '#1677ff' }} />,
-    description: '帮我写一段代码',
-  },
-];
 
 interface ChatProps {
   sessionId: string;
@@ -124,18 +106,33 @@ const Chat: React.FC<ChatProps> = ({ sessionId }) => {
                     
                     if (language) {
                       return (
-                        <SyntaxHighlighter
-                          language={language}
-                          style={vs2015}
-                          customStyle={{
+                        <Card 
+                          size="small" 
+                          style={{ 
                             margin: '0.5em 0',
-                            padding: '1em',
-                            borderRadius: '4px',
-                            fontSize: '14px'
+                            backgroundColor: '#1e1e1e',
+                            borderRadius: '8px'
                           }}
                         >
-                          {code}
-                        </SyntaxHighlighter>
+                          <Space style={{ width: '100%', justifyContent: 'flex-end' }}>
+                            <CopyOutlined 
+                              style={{ color: '#fff', cursor: 'pointer' }}
+                              onClick={() => copyMessage(code)}
+                            />
+                          </Space>
+                          <SyntaxHighlighter
+                            language={language}
+                            style={vs2015}
+                            customStyle={{
+                              margin: 0,
+                              padding: '1em',
+                              borderRadius: '4px',
+                              fontSize: '14px'
+                            }}
+                          >
+                            {code}
+                          </SyntaxHighlighter>
+                        </Card>
                       );
                     }
                     
@@ -168,7 +165,14 @@ const Chat: React.FC<ChatProps> = ({ sessionId }) => {
     }));
 
     return (
-      <Card style={{ width: '100%', marginBottom: 16 }}>
+      <Card 
+        style={{ 
+          width: '100%', 
+          marginBottom: 16,
+          borderRadius: '12px',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.06)'
+        }}
+      >
         <ThoughtChain
           size="small"
           items={items}
@@ -193,7 +197,7 @@ const Chat: React.FC<ChatProps> = ({ sessionId }) => {
   const renderMessage = (msg: Message) => {
     const isUser = msg.role === 'user';
     return (
-      <Flex vertical gap="small" style={{ width: '100%' }}>
+      <Flex vertical gap="small" style={{ width: '100%', marginBottom: '16px' }}>
         <Flex align="start" justify={isUser ? 'flex-end' : 'flex-start'}>
           {isUser ? (
             <Bubble
@@ -201,7 +205,12 @@ const Chat: React.FC<ChatProps> = ({ sessionId }) => {
               placement="end"
               variant="filled"
               shape="round"
-              style={{ maxWidth: '80%' }}
+              style={{ 
+                maxWidth: '80%',
+                backgroundColor: '#e6f4ff',
+                borderRadius: '12px',
+                padding: '12px 16px'
+              }}
               classNames={{
                 content: 'user-message'
               }}
@@ -377,21 +386,30 @@ const Chat: React.FC<ChatProps> = ({ sessionId }) => {
   };
 
   return (
-    <Flex vertical style={{ height: '100%' }}>
-      <Flex flex={1} vertical style={{ overflow: 'auto', padding: '16px' }}>
+    <Flex vertical style={{ height: '100%', padding: '24px' }}>
+      <Flex vertical flex={1} style={{ overflow: 'auto' }}>
         {messages.map((msg, index) => (
-          <div key={msg.id || index}>
+          <div key={msg.id || `msg-${index}`}>
             {renderMessage(msg)}
           </div>
         ))}
       </Flex>
-      <Sender
-        value={inputValue}
-        onChange={setInputValue}
-        onSubmit={handleRequest}
-        loading={isLoading}
-        placeholder="输入消息..."
-      />
+      <Flex vertical gap="middle" style={{ marginTop: '24px' }}>
+        <Sender
+          value={inputValue}
+          onChange={(value) => {
+            console.log('输入框值变化:', value);
+            setInputValue(value);
+          }}
+          onSubmit={handleRequest}
+          loading={isLoading}
+          placeholder="输入消息..."
+          style={{
+            borderRadius: '12px',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.06)'
+          }}
+        />
+      </Flex>
     </Flex>
   );
 };
