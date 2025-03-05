@@ -1,0 +1,53 @@
+{
+  "appId": "com.maoflow.app",
+  "productName": "MaoFlow",
+  "directories": {
+    "output": "dist",
+    "buildResources": "resources"
+  },
+  "files": [
+    "out",
+    "!backend"
+  ],
+  "extraResources": [
+    {
+      "from": "backend/dist/maoflow",
+      "to": "backend/maoflow"
+    },
+    {
+      "from": "backend/alembic.ini",
+      "to": "backend/alembic.ini"
+    },
+    {
+      "from": "backend/alembic",
+      "to": "backend/alembic"
+    },
+    {
+      "from": "backend/.env.development",
+      "to": "backend/.env.development"
+    },
+    {
+      "from": "backend/logs",
+      "to": "backend/logs",
+      "filter": ["**/*"]
+    }
+  ],
+  "mac": {
+    "target": ["dmg"],
+    "category": "public.app-category.developer-tools"
+  },
+  "dmg": {
+    "contents": [
+      {
+        "x": 130,
+        "y": 220
+      },
+      {
+        "x": 410,
+        "y": 220,
+        "type": "link",
+        "path": "/Applications"
+      }
+    ]
+  }
+} 

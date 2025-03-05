@@ -3,11 +3,16 @@ import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { spawn } from 'child_process'
 import { existsSync } from 'fs'
+import { setupFileHandlers } from './ipc/fileHandler'
+import { initDatabase } from './database'
 
 let pythonProcess: any = null
 let mainWindow: BrowserWindow | null = null
 
 function startPythonBackend(): void {
+  // 初始化数据库
+  const dbPath = initDatabase();
+
   // 确定后端可执行文件的路径
   let backendPath: string
   if (app.isPackaged) {
@@ -26,14 +31,18 @@ function startPythonBackend(): void {
       app.quit()
       return
     }
-    // 在打包环境中直接运行可执行文件
-    pythonProcess = spawn(backendPath, [], {
+    // 在打包环境中直接运行可执行文件，并传递数据库路径
+    pythonProcess = spawn(backendPath, ['--db-path', dbPath], {
       stdio: ['pipe', 'pipe', 'pipe']
     })
   } else {
-    // 在开发环境中使用 uvicorn
+    // 在开发环境中使用 uvicorn，并传递数据库路径环境变量
     pythonProcess = spawn('python', ['-m', 'uvicorn', 'app.main:app', '--reload', '--port', '17349'], {
-      cwd: backendPath
+      cwd: backendPath,
+      env: {
+        ...process.env,
+        MAOFLOW_DB_PATH: dbPath
+      }
     })
   }
 
@@ -91,19 +100,17 @@ function setupIpcHandlers() {
 function createWindow(): void {
   // Create the browser window.
   mainWindow = new BrowserWindow({
-    width: 900,
-    height: 670,
+    width: 1200,
+    height: 800,
     show: false,
     autoHideMenuBar: true,
     backgroundColor: '#f5f5f5',
     transparent: false,
     webPreferences: {
-      preload: join(__dirname, '../preload/index.js'),
-      sandbox: false,
-      webSecurity: false,  // 禁用 web 安全限制
-      allowRunningInsecureContent: true,  // 允许运行不安全内容
+      nodeIntegration: false,
       contextIsolation: true,
-      nodeIntegration: true
+      sandbox: false,
+      preload: join(__dirname, '../preload/index.js')
     }
   })
 
@@ -118,8 +125,9 @@ function createWindow(): void {
 
   // HMR for renderer base on electron-vite cli.
   // Load the remote URL for development or the local html file for production.
-  if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
-    mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
+  if (process.env.NODE_ENV === 'development') {
+    mainWindow.loadURL('http://localhost:5173')
+    mainWindow.webContents.openDevTools()
   } else {
     mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
   }
@@ -146,6 +154,8 @@ app.whenReady().then(() => {
   startPythonBackend()
 
   createWindow()
+
+  setupFileHandlers()
 
   app.on('activate', function () {
     // On macOS it's common to re-create a window in the app when the

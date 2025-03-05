@@ -6,10 +6,13 @@ import sys
 
 from sqlalchemy import pool
 from sqlalchemy.engine import Connection
-from sqlalchemy.ext.asyncio import async_engine_from_config
+from sqlalchemy import engine_from_config
 
 from alembic import context
 from dotenv import load_dotenv
+
+from core.config import settings
+from core.database import Base
 
 # 设置日志
 logger = logging.getLogger('alembic.migration')
@@ -26,11 +29,13 @@ load_dotenv('.env.development')
 # 这里导入所有的模型
 from app.system.models import User
 from app.llm.models import Conversation, Message, MessageItem, LLMModel
-from core.base_model import Base
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
+
+# 设置 SQLAlchemy URL
+config.set_main_option("sqlalchemy.url", settings.SQLITE_URL)
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
@@ -42,8 +47,6 @@ db_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'maoflow
 db_url = f"sqlite+aiosqlite:///{db_path}"
 logger.info(f"数据库路径: {db_path}")
 logger.info(f"数据库URL: {db_url}")
-
-config.set_main_option('sqlalchemy.url', db_url)
 
 # add your model's MetaData object here
 # for 'autogenerate' support
@@ -81,38 +84,24 @@ def run_migrations_offline() -> None:
         context.run_migrations()
     logger.info("离线迁移完成")
 
-def do_run_migrations(connection: Connection) -> None:
-    logger.info("开始执行迁移...")
-    context.configure(connection=connection, target_metadata=target_metadata)
-
-    with context.begin_transaction():
-        context.run_migrations()
-    logger.info("迁移执行完成")
-
-async def run_async_migrations() -> None:
+def run_migrations_online() -> None:
     """Run migrations in 'online' mode."""
-    logger.info("开始异步迁移...")
-    connectable = async_engine_from_config(
+    logger.info("运行在线迁移...")
+    connectable = engine_from_config(
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
     )
 
-    async with connectable.connect() as connection:
-        await connection.run_sync(do_run_migrations)
+    with connectable.connect() as connection:
+        context.configure(
+            connection=connection, target_metadata=target_metadata
+        )
 
-    await connectable.dispose()
-    logger.info("异步迁移完成")
+        with context.begin_transaction():
+            context.run_migrations()
 
-def run_migrations_online() -> None:
-    """Run migrations in 'online' mode."""
-    logger.info("运行在线迁移...")
-    try:
-        asyncio.run(run_async_migrations())
-        logger.info("在线迁移完成")
-    except Exception as e:
-        logger.error(f"迁移失败: {str(e)}")
-        raise
+    logger.info("在线迁移完成")
 
 if context.is_offline_mode():
     run_migrations_offline()

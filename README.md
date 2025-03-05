@@ -4,31 +4,19 @@
 
 ## 项目结构
 ```
-MaoFlow/
+src/
 ├── backend/               # Python FastAPI 后端
-│   ├── app/              # 后端应用代码
-│   │   └── main.py       # 主入口文件
-│   ├── config/           # 配置文件
-│   ├── tests/            # 测试文件
-│   ├── .env.development  # 开发环境配置
-│   └── requirements.txt  # Python 依赖
-├── web-ui/               # 前端代码（React）
-│   ├── src/
-│   │   ├── api/         # API 客户端
-│   │   ├── assets/      # 静态资源
-│   │   ├── components/  # UI 组件
-│   │   ├── pages/       # 页面组件
-│   │   ├── types/       # TypeScript 类型定义
-│   │   └── utils/       # 工具函数
-│   ├── public/          # 公共资源
-│   ├── .env.development # 开发环境配置
-│   └── package.json     # 前端依赖
-├── electron/             # Electron 相关代码
+├── ui/               # 各种前端代码
+├──── web-ui/               # web代码
+├──── mac-ui/               # 客户端代码
+├──── win-ui/               # win前端专属代码
+├──── shared-ui/               # 前端代码
+├── electron/             # 打包客户端主进程专有代码
 │   ├── main/            # 主进程代码
 │   └── preload/         # 预加载脚本
-├── package.json         # 项目依赖
-└── README.md           # 项目说明
 ```
+
+
 
 ## 环境要求
 

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Bubble, Sender, ThoughtChain, Attachments } from '@ant-design/x';
-import { App, Flex, Typography, Card, Space, UploadFile } from 'antd';
+import { App, Flex, Typography, Card, Space, UploadFile, Button } from 'antd';
 import { CopyOutlined, RobotOutlined, UserOutlined, LoadingOutlined, FileOutlined } from '@ant-design/icons';
 import ReactMarkdown from 'react-markdown';
 import { Light as SyntaxHighlighter } from 'react-syntax-highlighter';
@@ -11,6 +11,7 @@ import typescript from 'react-syntax-highlighter/dist/esm/languages/hljs/typescr
 import bash from 'react-syntax-highlighter/dist/esm/languages/hljs/bash';
 import { Message, MessageType, MessageItem } from './types';
 import { API_BASE_URL, API_PREFIX } from '../config';
+import { isElectron, IPC_CHANNELS, IPCEvents } from '../platform/ipc';
 
 // 注册常用的编程语言
 SyntaxHighlighter.registerLanguage('python', python);
@@ -429,56 +430,121 @@ const Chat: React.FC<ChatProps> = ({ sessionId }) => {
     }
   };
 
+  const handleSelectFile = () => {
+    if (window.electron) {
+      window.electron.ipcRenderer.send(IPC_CHANNELS.SELECT_FILE);
+    }
+  };
+
+  useEffect(() => {
+    if (window.electron) {
+      const handleSelectedFile = (data: IPCEvents[typeof IPC_CHANNELS.SELECTED_FILE]) => {
+        if (data.isDirectory && data.files) {
+          // 处理目录
+          message.info(`正在上传目录 "${data.fileName}" 中的文件...`);
+          
+          // 为每个文件创建 File 对象并上传
+          data.files.forEach(async (fileInfo) => {
+            const file = new File([fileInfo.content], fileInfo.name, {
+              type: 'text/plain',
+            });
+            await handleFileUpload(file);
+          });
+          
+          message.success(`目录 "${data.fileName}" 中的文件上传完成`);
+        } else {
+          // 处理单个文件
+          const file = new File([data.fileContent], data.fileName, {
+            type: 'text/plain',
+          });
+          handleFileUpload(file);
+        }
+      };
+
+      window.electron?.ipcRenderer.on(IPC_CHANNELS.SELECTED_FILE, handleSelectedFile);
+
+      return () => {
+        window.electron?.ipcRenderer.removeListener(IPC_CHANNELS.SELECTED_FILE, handleSelectedFile);
+      };
+    }
+  }, []);
+
+  // 添加到组件顶部的样式定义
+  const styles = `
+    .upload-area:hover {
+      border-color: #1677ff !important;
+      background-color: rgba(22, 119, 255, 0.02);
+    }
+  `;
+
   return (
-    <Flex vertical style={{ height: '100%', padding: '24px' }}>
-      <Flex vertical flex={1} style={{ overflow: 'auto' }}>
-        {messages.map((msg, index) => (
-          <div key={msg.id || `msg-${index}`}>
-            {renderMessage(msg)}
-          </div>
-        ))}
+    <>
+      <style>{styles}</style>
+      <Flex vertical style={{ height: '100%', padding: '24px' }}>
+        <Flex vertical flex={1} style={{ overflow: 'auto' }}>
+          {messages.map((msg, index) => (
+            <div key={msg.id || `msg-${index}`}>
+              {renderMessage(msg)}
+            </div>
+          ))}
+        </Flex>
+        <Flex vertical gap="middle" style={{ marginTop: '24px' }}>
+          {!isElectron() ? (
+            <Attachments
+              items={attachments}
+              onChange={(info) => {
+                const fileList = info.fileList;
+                setAttachments(fileList);
+                if (fileList.length > 0) {
+                  const lastFile = fileList[fileList.length - 1];
+                  if (lastFile.originFileObj) {
+                    handleFileUpload(lastFile.originFileObj);
+                  }
+                }
+              }}
+              placeholder={{
+                icon: <FileOutlined style={{ fontSize: 20, color: '#1677ff' }} />,
+                title: '点击或拖拽文件到此处上传',
+                description: '支持图片、文档、音频等文件类型'
+              }}
+              className="upload-area"
+              style={{
+                borderRadius: '8px',
+                border: '1px dashed #d9d9d9',
+                padding: '12px',
+                marginBottom: '12px',
+                minHeight: '80px',
+                maxHeight: '120px',
+                transition: 'all 0.3s',
+                cursor: 'pointer'
+              }}
+            />
+          ) : (
+            <Button 
+              icon={<FileOutlined />}
+              onClick={handleSelectFile}
+              style={{ marginBottom: '12px' }}
+            >
+              选择文件或目录
+            </Button>
+          )}
+          <Sender
+            value={inputValue}
+            onChange={(value) => {
+              console.log('输入框值变化:', value);
+              setInputValue(value);
+            }}
+            onSubmit={handleRequest}
+            loading={isLoading}
+            placeholder="输入消息..."
+            style={{
+              borderRadius: '12px',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.06)'
+            }}
+          />
+        </Flex>
       </Flex>
-      <Flex vertical gap="middle" style={{ marginTop: '24px' }}>
-        <Attachments
-          items={attachments}
-          onChange={(info) => {
-            const fileList = info.fileList;
-            setAttachments(fileList);
-            if (fileList.length > 0) {
-              const lastFile = fileList[fileList.length - 1];
-              if (lastFile.originFileObj) {
-                handleFileUpload(lastFile.originFileObj);
-              }
-            }
-          }}
-          placeholder={{
-            icon: <FileOutlined style={{ fontSize: 24, color: '#1677ff' }} />,
-            title: '点击或拖拽文件到此处上传',
-            description: '支持图片、文档、音频等文件类型'
-          }}
-          style={{
-            borderRadius: '12px',
-            border: '1px dashed #d9d9d9',
-            padding: '16px',
-            marginBottom: '16px'
-          }}
-        />
-        <Sender
-          value={inputValue}
-          onChange={(value) => {
-            console.log('输入框值变化:', value);
-            setInputValue(value);
-          }}
-          onSubmit={handleRequest}
-          loading={isLoading}
-          placeholder="输入消息..."
-          style={{
-            borderRadius: '12px',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.06)'
-          }}
-        />
-      </Flex>
-    </Flex>
+    </>
   );
 };
 
